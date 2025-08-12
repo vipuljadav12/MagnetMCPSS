@@ -292,7 +292,6 @@
                             borderWidth: 2
                         }]
                     };
-                    console.log(data1);
                     var ctx1 = document.getElementById('myChart1').getContext('2d');
 
                      var option1 = {
