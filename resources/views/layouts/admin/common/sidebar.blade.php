@@ -481,9 +481,9 @@
                                     href="{{ url('/admin/Form') }}"
                                     class="{{ Request::is('admin/Form*') ? 'active' : '' }}"><span>Submissions Form
                                         Master</span></a></li>
-                            <li class="{{ Request::is('admin/Reports*') ? 'mm-active' : '' }}"><a
+                            <li class="{{ Request::is('admin/Reports') ? 'mm-active' : '' }}"><a
                                     title="Report Master" href="{{ url('/admin/Reports') }}"
-                                    class="{{ Request::is('admin/Reports*') ? 'active' : '' }}"><span>Selection
+                                    class="{{ Request::is('admin/Reports') ? 'active' : '' }}"><span>Selection
                                         Report
                                         Master</span></a></li>
                             <li class="{{ Request::is('admin/Role*') ? 'mm-active' : '' }}"><a

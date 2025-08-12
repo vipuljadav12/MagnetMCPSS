@@ -1,13 +1,13 @@
-@extends('layouts.admin.app')
-@section('title')
-		 Audit Trails | {{config('APP_NAME',env("APP_NAME"))}} 
-@endsection
-@section('styles')
+
+<?php $__env->startSection('title'); ?>
+		 Audit Trails | <?php echo e(config('APP_NAME',env("APP_NAME"))); ?> 
+<?php $__env->stopSection(); ?>
+<?php $__env->startSection('styles'); ?>
     <!-- DataTables -->
-    <link href="{{asset('resources/assets/admin/plugins/DataTables/DataTables-1.10.21/css/dataTables.bootstrap4.min.css')}}" rel="stylesheet" type="text/css" />
-    <link href="{{asset('resources/assets/admin/plugins/DataTables/Buttons-1.6.2/css/buttons.bootstrap4.min.css')}}" rel="stylesheet" type="text/css" />
+    <link href="<?php echo e(asset('resources/assets/admin/plugins/DataTables/DataTables-1.10.21/css/dataTables.bootstrap4.min.css')); ?>" rel="stylesheet" type="text/css" />
+    <link href="<?php echo e(asset('resources/assets/admin/plugins/DataTables/Buttons-1.6.2/css/buttons.bootstrap4.min.css')); ?>" rel="stylesheet" type="text/css" />
     <!-- Responsive datatable examples -->
-    <link href="{{asset('resources/assets/admin/plugins/DataTables/Responsive-2.2.5/css/responsive.bootstrap4.min.css')}}" rel="stylesheet" type="text/css" />
+    <link href="<?php echo e(asset('resources/assets/admin/plugins/DataTables/Responsive-2.2.5/css/responsive.bootstrap4.min.css')); ?>" rel="stylesheet" type="text/css" />
 
     <style type="text/css">
     	.text-strong
@@ -18,8 +18,8 @@
     margin: 5px !important;
 }
     </style>
-@endsection
-@section('content')
+<?php $__env->stopSection(); ?>
+<?php $__env->startSection('content'); ?>
     <div class="card shadow">
         <div class="card-body d-flex align-items-center justify-content-between flex-wrap">
             <div class="page-title mt-5 mb-5">Audit Trail</div>
@@ -38,7 +38,7 @@
                 	<div class="card shadow">
 				        <div class="card-body">
 
-				        	@include("AuditTrailData::admin.submission")				            
+				        	<?php echo $__env->make("AuditTrailData::admin.submission", array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>				            
 				        </div>
 				    </div>
                 </div>
@@ -47,7 +47,7 @@
                 <div class="">
                    <div class="card shadow">
 				        <div class="card-body">
-				        	@include("AuditTrailData::admin.general")				            
+				        	<?php echo $__env->make("AuditTrailData::admin.general", array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>				            
 
 				            
 				        </div>
@@ -56,8 +56,8 @@
             </div>
         </div>
 			    
-@endsection
-@section('scripts')
+<?php $__env->stopSection(); ?>
+<?php $__env->startSection('scripts'); ?>
     <script type="text/javascript">
         $(document).ready(function() {
 	        $(".alert").delay(2000).fadeOut(1000);
@@ -107,4 +107,5 @@
 	    });
     
     </script>
-@endsection
+<?php $__env->stopSection(); ?>
+<?php echo $__env->make('layouts.admin.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\vipuljadav\www\projects\laravel\MagnetMCPSS\app/Modules/AuditTrailData/Views/admin/index.blade.php ENDPATH**/ ?>

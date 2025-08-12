@@ -481,9 +481,9 @@
                                     href="<?php echo e(url('/admin/Form')); ?>"
                                     class="<?php echo e(Request::is('admin/Form*') ? 'active' : ''); ?>"><span>Submissions Form
                                         Master</span></a></li>
-                            <li class="<?php echo e(Request::is('admin/Reports*') ? 'mm-active' : ''); ?>"><a
+                            <li class="<?php echo e(Request::is('admin/Reports') ? 'mm-active' : ''); ?>"><a
                                     title="Report Master" href="<?php echo e(url('/admin/Reports')); ?>"
-                                    class="<?php echo e(Request::is('admin/Reports*') ? 'active' : ''); ?>"><span>Selection
+                                    class="<?php echo e(Request::is('admin/Reports') ? 'active' : ''); ?>"><span>Selection
                                         Report
                                         Master</span></a></li>
                             <li class="<?php echo e(Request::is('admin/Role*') ? 'mm-active' : ''); ?>"><a
