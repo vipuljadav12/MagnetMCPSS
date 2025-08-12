@@ -1,13 +1,10 @@
 <?php
+
 namespace App\Modules\Program\Models;
-
-
 use Illuminate\Database\Eloquent\Model;
 
 class ProgramEligibility extends Model
 {
-
-    //
     protected $table = 'program_eligibility';
     public $primaryKey = 'id';
     public $traitField = "program_id";
@@ -25,5 +22,4 @@ class ProgramEligibility extends Model
         'updated_at',
         'status',
     ];
-
 }

@@ -1,6 +1,6 @@
 <?php
-namespace App\Modules\Program\Models;
 
+namespace App\Modules\Program\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
@@ -22,5 +22,4 @@ class ProgramEligibilityLateSubmission extends Model
         'updated_at',
         'status',
     ];
-
 }

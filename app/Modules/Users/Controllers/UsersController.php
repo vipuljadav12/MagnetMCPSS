@@ -10,30 +10,30 @@ use Illuminate\Http\Resources\Json\Resource;
 use Illuminate\Support\Facades\Hash;
 use App\Modules\Program\Models\Program;
 use App\Modules\District\Models\District;
-use Session;
-use Auth;
-use Mail;
 use App\Traits\AuditTrail;
-
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Session;
 
 class UsersController extends Controller
 {
     use AuditTrail;
+    protected $stores;
+    protected $programs;
     /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
      */
     // private $stores;
-    public function  __construct($value='')
+    public function  __construct($value = '')
     {
-         $this->stores = District::all();
-         $this->programs = Program::all();
+        $this->stores = District::all();
+        $this->programs = Program::all();
     }
     public function index()
     {
-        $users = User::where('role_id','!=',1)->where('district_id',Session::get("district_id"))->where("status","!=","T")->get();
-        return view("Users::index")->with(["users"=>$users]);
+        $users = User::where('role_id', '!=', 1)->where('district_id', Session::get("district_id"))->where("status", "!=", "T")->get();
+        return view("Users::index")->with(["users" => $users]);
     }
 
     /**
@@ -43,16 +43,16 @@ class UsersController extends Controller
      */
     public function create()
     {
-        $roles = Roles::where("id","!=",1)->get()->all();
-        if(\Session::get("district_id") != '0')
-            $programs=Program::where('status','!=','T')->where('district_id', \Session::get('district_id'))->get();
+        $roles = Roles::where("id", "!=", 1)->get()->all();
+        if (Session::get("district_id") != '0')
+            $programs = Program::where('status', '!=', 'T')->where('district_id', Session::get('district_id'))->get();
         else
-            $programs=Program::where('status','!=','T')->get();
+            $programs = Program::where('status', '!=', 'T')->get();
 
         // return $programs;
         // return  $this->stores;
         // return Session::get("district_id");
-        return view("Users::create")->with(['roles'=>$roles,"stores"=>$this->stores,"programs"=>$this->programs]);
+        return view("Users::create")->with(['roles' => $roles, "stores" => $this->stores, "programs" => $this->programs]);
     }
 
     /**
@@ -63,9 +63,9 @@ class UsersController extends Controller
      */
     public function store(Request $request)
     {
-         $insertData = $request->except("_token");
-         // return $insertData;
-        $insertData['username'] = $insertData['first_name'].$insertData['last_name'];
+        $insertData = $request->except("_token");
+        // return $insertData;
+        $insertData['username'] = $insertData['first_name'] . $insertData['last_name'];
         $insertData['password'] = bcrypt($insertData['password']);
         $insertData['status'] = "Y";
         // return Session::get("district_id");
@@ -73,40 +73,30 @@ class UsersController extends Controller
         // $insertData['district_id'] = isset($insertData['district']) ? implode(',',$insertData['district']) : null;
         $insertData['district_id'] = Session::get("district_id");
         // return $insertData;
-        if($this->validateUserForm($request))
-        {
+        if ($this->validateUserForm($request)) {
             $result =  User::create($insertData);
             $result['plain_password'] = $request->password;
-            if($result)
-            {
+            if ($result) {
                 /*Mail::send('Users::registration', ['user' => $result], function ($mail) use ($result) {
                     // $mail->from('hello@app.com', 'Your Application');
 
                     $mail->to($result->email, $result->name)->subject('New User registration');
                 });*/
-                Session::flash("success","User created successfully");
+                Session::flash("success", "User created successfully");
+            } else {
+                Session::flash("error", "Please Try Again");
             }
-            else
-            {
-                Session::flash("error","Please Try Again");
-            }
-            if (isset($request->save_exit))
-            {
+            if (isset($request->save_exit)) {
                 return redirect('admin/Users');
+            } else {
+                return redirect('admin/Users/edit/' . $result->id);
             }
-            else
-            {
-                return redirect('admin/Users/edit/'.$result->id);
-
-            }
-            if (isset($request->save_edit))
-            {
-                return redirect('admin/Users/edit/'.$result->id);
+            if (isset($request->save_edit)) {
+                return redirect('admin/Users/edit/' . $result->id);
             }
             return  redirect("admin/Users");
         }
         return $request;
-
     }
     public function validateUserForm($request)
     {
@@ -126,7 +116,7 @@ class UsersController extends Controller
             'password.min' => "Please enter minimum 8 charcter password",
             'role_id.required' =>  "Please select User Type",
         ];
-        $validatedData = $request->validate($rules,$messages);
+        $validatedData = $request->validate($rules, $messages);
         return true;
     }
     /**
@@ -151,7 +141,7 @@ class UsersController extends Controller
         $roles = Roles::all();
         //echo $user->district_id;exit;
         //$user->district_id = explode(',',($user->district_id!= '' ? $user->district_id : 0));
-        return view("Users::edit")->with(["user"=>$user,"roles"=>$roles,"stores"=>$this->stores]);
+        return view("Users::edit")->with(["user" => $user, "roles" => $roles, "stores" => $this->stores]);
     }
 
     /**
@@ -161,57 +151,45 @@ class UsersController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request,User $user)
+    public function update(Request $request, User $user)
     {
         /// return $request;
-        if($this->validateUserUpdateForm($request))
-        {
-            $req = $request->except("_token",'save_exit','submit');
+        if ($this->validateUserUpdateForm($request)) {
+            $req = $request->except("_token", 'save_exit', 'submit');
             // $request['district_id'] = isset($request['district']) ? implode(',',$request['district']) : null;
 
             unset($request['district']);
-            $userObj =  User::where('id',$user->id)->first();
+            $userObj =  User::where('id', $user->id)->first();
             $initUser = $userObj;
             // $req = $request;
             // return $request;
-            if (isset($request->password))
-            {
-                    $request->validate([
-                        'password'=>'required|min:8',
-                    ]);
-                    $req['password'] = bcrypt($request->password);
-            }
-            else
-            {
+            if (isset($request->password)) {
+                $request->validate([
+                    'password' => 'required|min:8',
+                ]);
+                $req['password'] = bcrypt($request->password);
+            } else {
                 unset($req['password']);
             }
             unset($req['password_confirmation']);
 
-            $result =  User::where('id',$user->id)->update($req);
-            $newObj =  User::where('id',$user->id)->first();
-            $this->modelChanges($initUser,$newObj,"user");
+            $result =  User::where('id', $user->id)->update($req);
+            $newObj =  User::where('id', $user->id)->first();
+            $this->modelChanges($initUser, $newObj, "user");
             $result =  $newObj;
-            
-            if($result)
-            {
-                Session::flash("success","User updated successfully");
+
+            if ($result) {
+                Session::flash("success", "User updated successfully");
+            } else {
+                Session::flash("error", "Please Try Again");
             }
-            else
-            {
-                Session::flash("error","Please Try Again");
-            }
-            if (isset($request->save_exit))
-            {
+            if (isset($request->save_exit)) {
                 return redirect('admin/Users');
+            } else {
+                return redirect('admin/Users/edit/' . $user->id);
             }
-            else
-            {
-                return redirect('admin/Users/edit/'.$user->id);
-                   
-            }
-            if (isset($request->save_edit))
-            {
-                return redirect('admin/Users/edit/'.$user->id);
+            if (isset($request->save_edit)) {
+                return redirect('admin/Users/edit/' . $user->id);
             }
             return  redirect("admin/Users");
         }
@@ -228,18 +206,18 @@ class UsersController extends Controller
         $messages = [
             'first_name.required' => "First Name is required.",
             'last_name.required' => "Last Name is required.",
-           /* 'email.required' => "Email is required.",
+            /* 'email.required' => "Email is required.",
             'email.email' => "Please enter valid Email.",
             'password.required' => "Password is required",
             'password.min' => "Please enter minimum 8 charcter password",*/
             'role_id.required' =>  "Please select User Type",
         ];
-        $validatedData = $request->validate($rules,$messages);
+        $validatedData = $request->validate($rules, $messages);
         return true;
     }
     public function status(Request $req)
     {
-        $user = User::where('id',$req['user_id'])->first();
+        $user = User::where('id', $req['user_id'])->first();
         $user->status = $user->status == "Y" ? "N" : "Y";
         $user->save();
         return "true";
@@ -248,32 +226,26 @@ class UsersController extends Controller
     {
         $user->status = "T";
         $result = $user->save();
-        if($result)
-        {
-            Session::flash("success","User moved to trash successfully");
-        }
-        else
-        {
-            Session::flash("error","Please try again");
+        if ($result) {
+            Session::flash("success", "User moved to trash successfully");
+        } else {
+            Session::flash("error", "Please try again");
         }
         return redirect("admin/Users");
     }
     public function trashindex()
     {
-        $users=User::where('status','T')->where('district_id',Session::get("district_id"))->get();
-        return view('Users::trash',compact('users'));
+        $users = User::where('status', 'T')->where('district_id', Session::get("district_id"))->get();
+        return view('Users::trash', compact('users'));
     }
     public function restore(User $user)
     {
         $user->status = "Y";
         $result = $user->save();
-        if($result)
-        {
-            Session::flash("success","User restore successfully");
-        }
-        else
-        {
-            SSession::flash("error","Please try again");
+        if ($result) {
+            Session::flash("success", "User restore successfully");
+        } else {
+            Session::flash("error", "Please try again");
         }
         return redirect("admin/Users");
     }
@@ -288,52 +260,45 @@ class UsersController extends Controller
     {
         //
     }
-    public function UpdateProfile(Request $request,$id)
+    public function UpdateProfile(Request $request, $id)
     {
-//        return $request;
+        //        return $request;
         $request->validate([
-            'first_name'=>'required|max:255',
-            'last_name'=>'required|max:255',
-            'username'=>'required|max:255',
-            'profile'=>'mimes:jpg,png,jpeg,gif',
+            'first_name' => 'required|max:255',
+            'last_name' => 'required|max:255',
+            'username' => 'required|max:255',
+            'profile' => 'mimes:jpg,png,jpeg,gif',
         ]);
-        $data=[
-            'first_name'=>$request->first_name,
-            'last_name'=>$request->last_name,
-            'profile'=>$id.'_profile.png',
-            'username'=>$request->username,
+        $data = [
+            'first_name' => $request->first_name,
+            'last_name' => $request->last_name,
+            'profile' => $id . '_profile.png',
+            'username' => $request->username,
         ];
-        $logo=$request->file('profile');
-        if ($logo)
-        {
-            $logo->move('resources/assets/admin/images/',$id.'_profile.png');
+        $logo = $request->file('profile');
+        if ($logo) {
+            $logo->move('resources/assets/admin/images/', $id . '_profile.png');
         }
-        if (isset($request->password))
-        {
-            if ($this->checkOldPass($request)=='true')
-            {
+        if (isset($request->password)) {
+            if ($this->checkOldPass($request) == 'true') {
                 $request->validate([
-                    'password'=>'min:8|max:255|confirmed',
+                    'password' => 'min:8|max:255|confirmed',
                 ]);
-                $data=$data+['password'=>bcrypt($request->password)];
-              }
-            else
-            {
-                return redirect()->back()->withErrors(['old_password'=>'The password is incorrect.']);
+                $data = $data + ['password' => bcrypt($request->password)];
+            } else {
+                return redirect()->back()->withErrors(['old_password' => 'The password is incorrect.']);
             }
         }
-        User::where('id',$id)->update($data);
+        User::where('id', $id)->update($data);
         return redirect()->back();
     }
 
     public function uniqueemail(Request $request)
     {
-        $result=User::where('id','!=',$request->id)->where('email',$request->email)->first();
-        if(isset($result))
-        {
+        $result = User::where('id', '!=', $request->id)->where('email', $request->email)->first();
+        if (isset($result)) {
             return json_encode(false);
-        }
-        else {
+        } else {
             return json_encode(true);
         }
     }
@@ -341,13 +306,11 @@ class UsersController extends Controller
     {
         // return $request;
         // $result= User::where('id',$request->id)->first();
-        $result= User::where('id',Auth::user()->id)->first();
-        if (Hash::check($request->old_password, $result->password)){
+        $result = User::where('id', Auth::user()->id)->first();
+        if (Hash::check($request->old_password, $result->password)) {
             return 'true';
-        }
-        else{
+        } else {
             return 'false';
         }
     }
 }
-

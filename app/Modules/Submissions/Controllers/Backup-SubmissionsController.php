@@ -27,10 +27,6 @@ use App\Modules\EditCommunication\Models\{EditCommunication,EditCommunicationLog
 use App\Modules\DistrictConfiguration\Models\DistrictConfiguration;
 use App\Modules\Waitlist\Models\{WaitlistProcessLogs,WaitlistAvailabilityLog,WaitlistAvailabilityProcessLog,WaitlistIndividualAvailability,WaitlistEditCommunication};
 use App\Modules\LateSubmission\Models\{LateSubmissionProcessLogs,LateSubmissionEditCommunication};
-
-
-
-
 use App\StudentGrade;
 use App\StudentCDI;
 use Config;

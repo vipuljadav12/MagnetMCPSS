@@ -2,7 +2,7 @@
 
 namespace App\Modules\Reports\Export;
 
-use Maatwebsite\Excel\Concerns\{Exportable,WithEvents,FromCollection,ShouldAutoSize,WithHeadings};
+use Maatwebsite\Excel\Concerns\{Exportable, WithEvents, FromCollection, ShouldAutoSize, WithHeadings};
 use Maatwebsite\Excel\Events\AfterSheet;
 
 class MissingCDIExport implements FromCollection, WithHeadings, ShouldAutoSize, WithEvents
@@ -22,7 +22,7 @@ class MissingCDIExport implements FromCollection, WithHeadings, ShouldAutoSize, 
     public function headings(): array
     {
         return $headings = [];
-/*	        "Submission ID",
+        /*	        "Submission ID",
 			"Submission Status",
 			"Race",
 			"State ID",
@@ -40,15 +40,15 @@ class MissingCDIExport implements FromCollection, WithHeadings, ShouldAutoSize, 
 
     public function registerEvents(): array
     {
-    	return [
-    		AfterSheet::class    => function(AfterSheet $event) {
-    			$event->sheet->getDelegate()->getRowDimension(1)->setRowHeight(25);
-    			$styleArray = [
+        return [
+            AfterSheet::class    => function (AfterSheet $event) {
+                $event->sheet->getDelegate()->getRowDimension(1)->setRowHeight(25);
+                $styleArray = [
                     'font' => [
                         'family' => 'Open Sans',
                         'size' =>  13,
                         'bold' => true,
-                        ],
+                    ],
                     'alignment' => [
                         'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
                         'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
@@ -63,7 +63,7 @@ class MissingCDIExport implements FromCollection, WithHeadings, ShouldAutoSize, 
                         'family' => 'Open Sans',
                         'size' =>  13,
                         'bold' => false,
-                        ],
+                    ],
                     'alignment' => [
                         'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
                         'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
@@ -74,8 +74,8 @@ class MissingCDIExport implements FromCollection, WithHeadings, ShouldAutoSize, 
                 $to = $event->sheet->getDelegate()->getHighestColumn();
                 $toC = $event->sheet->getDelegate()->getHighestRow();
 
-                $event->sheet->getDelegate()->getStyle('A2:'.$to.$toC)->applyFromArray($styleArray);
-               
+                $event->sheet->getDelegate()->getStyle('A2:' . $to . $toC)->applyFromArray($styleArray);
+
                 $styleArray = [
                     'fill' => [
                         'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
@@ -84,7 +84,7 @@ class MissingCDIExport implements FromCollection, WithHeadings, ShouldAutoSize, 
                 ];
                 $event->sheet->getDelegate()->getStyle('J1:O1')->applyFromArray($styleArray);
 
-//                $sheet->getStyle('A2:Q100')->applyFromArray($styleArray);
+                //                $sheet->getStyle('A2:Q100')->applyFromArray($styleArray);
                 /*$conditional1 = new Conditional();
                 $conditional1->setConditionType(Conditional::CONDITION_CONTAINSTEXT);
                 $conditional1->setOperatorType(Conditional::OPERATOR_EQUAL );
@@ -93,8 +93,7 @@ class MissingCDIExport implements FromCollection, WithHeadings, ShouldAutoSize, 
                 $conditional1->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getEndColor()->setARGB(Color::COLOR_RED);
                 $conditionalStyles[] = $conditional1;
                 $sheet->getStyle('J2:Z130000')->setConditionalStyles($conditional1);*/
-    		}
+            }
         ];
     }
-
 }

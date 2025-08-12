@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
+
 Route::group(['prefix'=>'admin/Files', 'module' => 'Files', 'middleware' => ['web', 'auth'], 'namespace' => 'App\Modules\Files\Controllers'], function() {
 
 	Route::get('/', 'FilesController@index');

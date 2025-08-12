@@ -1,6 +1,8 @@
 <?php
 
-Route::group(['prefix'=>'admin/Priority', 'module' => 'Priority', 'middleware' => ['web', 'auth'], 'namespace' => 'App\Modules\Priority\Controllers'], function() {
+use Illuminate\Support\Facades\Route;
+
+Route::group(['prefix' => 'admin/Priority', 'module' => 'Priority', 'middleware' => ['web', 'auth'], 'namespace' => 'App\Modules\Priority\Controllers'], function () {
 
 	Route::get('/', 'PriorityController@index');
 	Route::get('/create', 'PriorityController@create');

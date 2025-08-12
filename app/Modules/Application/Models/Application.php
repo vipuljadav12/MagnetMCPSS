@@ -4,20 +4,21 @@ namespace App\Modules\Application\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Application extends Model {
-
-    //
-	protected $table='application';
-	public $date_fields = ['starting_date',
-							'ending_date',
-							'admin_starting_date',
-							'admin_ending_date',
-							'recommendation_due_date',
-							'transcript_due_date',
-							'cdi_starting_date',
-							'cdi_ending_date'];
-	public $primary_key='id';
-	public $fillable=[
+class Application extends Model
+{
+	protected $table = 'application';
+	public $date_fields = [
+		'starting_date',
+		'ending_date',
+		'admin_starting_date',
+		'admin_ending_date',
+		'recommendation_due_date',
+		'transcript_due_date',
+		'cdi_starting_date',
+		'cdi_ending_date'
+	];
+	public $primary_key = 'id';
+	public $fillable = [
 		'district_id',
 		'application_name',
 		'form_id',

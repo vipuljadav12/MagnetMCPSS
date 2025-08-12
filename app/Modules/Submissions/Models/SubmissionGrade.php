@@ -5,8 +5,6 @@ namespace App\Modules\Submissions\Models;
 use Illuminate\Database\Eloquent\Model;
 
 class SubmissionGrade extends Model {
-
-    //
     public $timestamps = false;
     protected $table='submission_grade';
     protected $primaryKey='id';

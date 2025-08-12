@@ -12,24 +12,22 @@ use App\Modules\Enrollment\Models\Enrollment;
 use App\Modules\Application\Models\ApplicationProgram;
 use App\Modules\Application\Models\Application;
 use App\Modules\Program\Models\Program;
-use App\Modules\Submissions\Models\{Submissions,SubmissionGrade,SubmissionConductDisciplinaryInfo,SubmissionsFinalStatus,SubmissionsWaitlistFinalStatus,SubmissionsStatusUniqueLog,LateSubmissionFinalStatus};
-use App\Modules\Waitlist\Models\{WaitlistProcessLogs,WaitlistAvailabilityLog,WaitlistAvailabilityProcessLog,WaitlistIndividualAvailability};
-use App\Modules\LateSubmission\Models\{LateSubmissionProcessLogs,LateSubmissionAvailabilityLog,LateSubmissionAvailabilityProcessLog,LateSubmissionIndividualAvailability};
+use App\Modules\Submissions\Models\{Submissions, SubmissionGrade, SubmissionConductDisciplinaryInfo, SubmissionsFinalStatus, SubmissionsWaitlistFinalStatus, SubmissionsStatusUniqueLog, LateSubmissionFinalStatus};
+use App\Modules\Waitlist\Models\{WaitlistProcessLogs, WaitlistAvailabilityLog, WaitlistAvailabilityProcessLog, WaitlistIndividualAvailability};
+use App\Modules\LateSubmission\Models\{LateSubmissionProcessLogs, LateSubmissionAvailabilityLog, LateSubmissionAvailabilityProcessLog, LateSubmissionIndividualAvailability};
 use Maatwebsite\Excel\Facades\Excel;
-use App\Modules\Reports\Export\{SubmissionExport,MissingGradesExport,MissingCDIExport,GradeImport,CDIImport};
+use App\Modules\Reports\Export\{SubmissionExport, MissingGradesExport, MissingCDIExport, GradeImport, CDIImport};
 use App\Modules\Eligibility\Models\SubjectManagement;
-use App\Modules\SetAvailability\Models\{Availability,WaitlistAvailability,LateSubmissionAvailability};
-use Config;
-use Session;
-use DB;
-use Validator;  
+use App\Modules\SetAvailability\Models\{Availability, WaitlistAvailability, LateSubmissionAvailability};
 use Maatwebsite\Excel\HeadingRowImport;
 use App\Traits\AuditTrail;
-use Auth;
 use Illuminate\Support\Str;
 use App\Modules\ProcessSelection\Models\ProcessSelection;
-
-
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Validator;
 
 class ReportsController extends Controller
 {
@@ -43,127 +41,100 @@ class ReportsController extends Controller
      * @return \Illuminate\Http\Response
      */
 
-    public function waitlist_index($grade=0)
+    public function waitlist_index($grade = 0)
     {
         $settings = DB::table("reports_hide_option")->first();
         $availabilityArray = array();
         $allProgram = Availability::distinct()->where("district_id", Session::get("district_id"))->get(['program_id']);
-        foreach($allProgram as $key=>$value)
-        {
+        foreach ($allProgram as $key => $value) {
             $avail_grade = Availability::where("district_id", Session::get("district_id"))->where("program_id", $value->program_id)->get();
-            foreach($avail_grade as $gkey=>$gvalue)
-            {
+            foreach ($avail_grade as $gkey => $gvalue) {
                 $availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats;
             }
         }
 
         /* Get Next Grade Unique for Tabbing */
         $grade_data = Submissions::distinct()->where('next_grade', '<>', '')->orderBy('next_grade', 'DESC')->get(["next_grade"]);
-        $gradeArr = array("K","1","2","3","4","5","6","7","8","9","10","11","12");
+        $gradeArr = array("K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
         $fgradeTab = [];
-        foreach($grade_data as $key=>$value)
-        {
+        foreach ($grade_data as $key => $value) {
             $fgradeTab[] = $value->next_grade;
         }
         $gradeTab = [];
-        foreach($gradeArr as $key=>$value)
-        {
-            if(in_array($value, $fgradeTab))
+        foreach ($gradeArr as $key => $value) {
+            if (in_array($value, $fgradeTab))
                 $gradeTab[] = $value;
         }
 
-        if($grade == 0)
+        if ($grade == 0)
             $existGrade = $gradeTab[0];
         else
             $existGrade = $grade;
 
         $rs = WaitlistProcessLogs::where("last_date_online", ">", date("Y-m-d H:i:s"))->first();
-        if(!empty($rs))
-        {
+        if (!empty($rs)) {
             $version = $rs->version;
-        }
-        else
-        {
+        } else {
             $version = 0;
         }
 
 
         $firstData = Submissions::distinct()->get(["first_choice"]);
 
-         /* Get Subject and Acardemic Term like Q1.1 Q1.2 etc set for Academic Grade Calculation 
+        /* Get Subject and Acardemic Term like Q1.1 Q1.2 etc set for Academic Grade Calculation 
                 For all unique First Choice and Second Choice
          */
         $subjects = $terms = array();
         $eligibilityArr = array();
-        foreach($firstData as $value)
-        {
-            if($value->first_choice != "")
-            {
+        foreach ($firstData as $value) {
+            if ($value->first_choice != "") {
                 $eligibilityData = getEligibilities($value->first_choice, 'Academic Grade Calculation');
-                if(count($eligibilityData) > 0)
-                {
-                    if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                    {
+                if (count($eligibilityData) > 0) {
+                    if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
                         $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                       // echo $eligibilityData[0]->id;exit;
+                        // echo $eligibilityData[0]->id;exit;
                         $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
 
-                        if(!empty($content))
-                        {
-                            if($content->scoring->type=="DD")
-                            {
+                        if (!empty($content)) {
+                            if ($content->scoring->type == "DD") {
                                 $tmp = array();
-                                
-                                foreach($content->subjects as $value)
-                                {
-                                    if(!in_array($value, $subjects))
-                                    {
+
+                                foreach ($content->subjects as $value) {
+                                    if (!in_array($value, $subjects)) {
                                         $subjects[] = $value;
                                     }
                                 }
 
-                                foreach($content->terms_calc as $value)
-                                {
-                                    if(!in_array($value, $terms))
-                                    {
+                                foreach ($content->terms_calc as $value) {
+                                    if (!in_array($value, $terms)) {
                                         $terms[] = $value;
                                     }
                                 }
                             }
-                        }                        
+                        }
                     }
-
                 }
             }
         }
 
         $secondData = Submissions::distinct()->get(["second_choice"]);
-        foreach($secondData as $value)
-        {
-            if($value->second_choice != "")
-            {
+        foreach ($secondData as $value) {
+            if ($value->second_choice != "") {
                 $eligibilityData = getEligibilities($value->second_choice, 'Academic Grade Calculation');
-                if(count($eligibilityData) > 0)
-                {
+                if (count($eligibilityData) > 0) {
                     $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
-                    if(!empty($content))
-                    {
-                        if($content->scoring->type=="DD")
-                        {
+                    if (!empty($content)) {
+                        if ($content->scoring->type == "DD") {
                             $tmp = array();
-                            
-                            foreach($content->subjects as $value)
-                            {
-                                if(!in_array($value, $subjects))
-                                {
+
+                            foreach ($content->subjects as $value) {
+                                if (!in_array($value, $subjects)) {
                                     $subjects[] = $value;
                                 }
                             }
 
-                            foreach($content->terms_calc as $value)
-                            {
-                                if(!in_array($value, $terms))
-                                {
+                            foreach ($content->terms_calc as $value) {
+                                if (!in_array($value, $terms)) {
                                     $terms[] = $value;
                                 }
                             }
@@ -177,45 +148,33 @@ class ReportsController extends Controller
          */
 
         $setEligibilityData = array();
-        foreach($firstData as $value)
-        {
-            if(!in_array($value->first_choice, array_keys($setEligibilityData)))
-            {
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setEligibilityData))) {
                 $data = getSetEligibilityData($value->first_choice, 3);
-                foreach($subjects as $svalue)
-                {
-                    foreach($terms as $tvalue)
-                    {
-                        if(isset($data->{$svalue."-".$tvalue}))
-                        {
-                            $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = $data->{$svalue."-".$tvalue}[0];
+                foreach ($subjects as $svalue) {
+                    foreach ($terms as $tvalue) {
+                        if (isset($data->{$svalue . "-" . $tvalue})) {
+                            $setEligibilityData[$value->first_choice][$svalue . "-" . $tvalue] = $data->{$svalue . "-" . $tvalue}[0];
                         }
-/*                        else
+                        /*                        else
                             $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
                     }
                 }
             }
-
         }
-        foreach($secondData as $value)
-        {
-            if(!in_array($value->second_choice, array_keys($setEligibilityData)))
-            {
+        foreach ($secondData as $value) {
+            if (!in_array($value->second_choice, array_keys($setEligibilityData))) {
                 $data = getSetEligibilityData($value->second_choice, 3);
-                foreach($subjects as $svalue)
-                {
-                    foreach($terms as $tvalue)
-                    {
-                        if(isset($data->{$svalue."-".$tvalue}))
-                        {
-                            $setEligibilityData[$value->second_choice][$svalue."-".$tvalue] = $data->{$svalue."-".$tvalue}[0];
+                foreach ($subjects as $svalue) {
+                    foreach ($terms as $tvalue) {
+                        if (isset($data->{$svalue . "-" . $tvalue})) {
+                            $setEligibilityData[$value->second_choice][$svalue . "-" . $tvalue] = $data->{$svalue . "-" . $tvalue}[0];
                         }
-                     /*   else
+                        /*   else
                             $setEligibilityData[$value->second_choice][$svalue."-".$tvalue] = 50;*/
                     }
                 }
             }
-
         }
 
 
@@ -223,13 +182,10 @@ class ReportsController extends Controller
          */
 
         $setCDIEligibilityData = array();
-        foreach($firstData as $value)
-        {
-            if(!in_array($value->first_choice, array_keys($setCDIEligibilityData)))
-            {
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setCDIEligibilityData))) {
                 $data = getSetEligibilityData($value->first_choice, 8);
-                if(!empty($data))
-                {
+                if (!empty($data)) {
                     $setCDIEligibilityData[$value->first_choice]['b_info'] = $data->B[0];
                     $setCDIEligibilityData[$value->first_choice]['c_info'] = $data->C[0];
                     $setCDIEligibilityData[$value->first_choice]['d_info'] = $data->D[0];
@@ -239,13 +195,10 @@ class ReportsController extends Controller
                 }
             }
         }
-        foreach($secondData as $value)
-        {
-            if(!in_array($value->second_choice, array_keys($setCDIEligibilityData)))
-            {
+        foreach ($secondData as $value) {
+            if (!in_array($value->second_choice, array_keys($setCDIEligibilityData))) {
                 $data = getSetEligibilityData($value->second_choice, 8);
-                if(!empty($data))
-                {
+                if (!empty($data)) {
                     $setCDIEligibilityData[$value->second_choice]['b_info'] = $data->B[0];
                     $setCDIEligibilityData[$value->second_choice]['c_info'] = $data->C[0];
                     $setCDIEligibilityData[$value->second_choice]['d_info'] = $data->D[0];
@@ -257,21 +210,16 @@ class ReportsController extends Controller
         }
         /* Get CDI Data */
 
-        if($version > 0)
-        {
-            $submissions=Submissions::
-                where('submissions.district_id', Session::get('district_id'))
-                ->where('next_grade',$existGrade)
+        if ($version > 0) {
+            $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))
+                ->where('next_grade', $existGrade)
                 ->where('submission_status', '<>', 'Application Withdrawn')
-                ->join("submissions_waitlist_final_status", "submissions_waitlist_final_status.submission_id", "submissions.id")->where("version", $version)->select("submissions.*", "submissions_waitlist_final_status.first_offer_status", "submissions_waitlist_final_status.second_offer_status")// Pending Code here 
-    //            ->limit(5)
+                ->join("submissions_waitlist_final_status", "submissions_waitlist_final_status.submission_id", "submissions.id")->where("version", $version)->select("submissions.*", "submissions_waitlist_final_status.first_offer_status", "submissions_waitlist_final_status.second_offer_status") // Pending Code here 
+                //            ->limit(5)
                 ->get();
-        }
-        else
-        {
-            $submissions=Submissions::
-                where('submissions.district_id', Session::get('district_id'))
-                ->where('next_grade',$existGrade)
+        } else {
+            $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))
+                ->where('next_grade', $existGrade)
                 ->whereIn('submission_status', array("Waitlisted", "Declined / Waitlist for other"))
                 ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_final_status.first_offer_status", "submissions_final_status.second_offer_status")
                 ->get();
@@ -279,282 +227,219 @@ class ReportsController extends Controller
 
         $firstdata = $seconddata = array();
         $programGrades = array();
-        foreach($submissions as $key=>$value)
-        {
+        foreach ($submissions as $key => $value) {
             $failed = false;
-            if(!isset($programGrades[$value->first_choice_program_id]))
-            {
+            if (!isset($programGrades[$value->first_choice_program_id])) {
                 $availableGrades = array();
                 $eligibilityData = getEligibilitiesByProgram($value->first_choice_program_id, 'Academic Grade Calculation');
-                if(isset($eligibilityData[0]))
-                {
-                    $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
+                if (isset($eligibilityData[0])) {
+                    $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
                     $programGrades[$value->first_choice_program_id] = $availableGrades;
                 }
-            } 
+            }
             $skip = false;
-            if($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id]))
-            {
+            if ($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id])) {
                 $skip = true;
             }
 
-            if($value->second_choice_program_id != '' && $value->second_choice_program_id != '0')
-            {
-                if(!isset($programGrades[$value->second_choice_program_id]))
-                {
+            if ($value->second_choice_program_id != '' && $value->second_choice_program_id != '0') {
+                if (!isset($programGrades[$value->second_choice_program_id])) {
                     $availableGrades = array();
                     $eligibilityData = getEligibilitiesByProgram($value->second_choice_program_id, 'Academic Grade Calculation');
-                    if(isset($eligibilityData[0]))
-                    {
-                        $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
+                    if (isset($eligibilityData[0])) {
+                        $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
                         $programGrades[$value->second_choice_program_id] = $availableGrades;
                     }
-                } 
-                if(!in_array($value->next_grade, $programGrades[$value->second_choice_program_id]))
-                {
+                }
+                if (!in_array($value->next_grade, $programGrades[$value->second_choice_program_id])) {
                     $skip = true;
                 }
             }
 
             $score = $this->collectionStudentGradeReport($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData);
-            if(count($score) <= 0)
-            {
+            if (count($score) <= 0) {
                 $failed = true;
                 $score = array();
-                foreach($subjects as $svalue)
-                {
-                    foreach($terms as $svalue1)
-                    {
+                foreach ($subjects as $svalue) {
+                    foreach ($terms as $svalue1) {
                         $score[$svalue][$svalue1] = "";
                     }
                 }
             }
 
-                if($skip)
-                {
+            if ($skip) {
+                $cdiArr = array();
+                $cdiArr['b_info'] = "NA";
+                $cdiArr['c_info'] = "NA";
+                $cdiArr['d_info'] = "NA";
+                $cdiArr['e_info'] = "NA";
+                $cdiArr['susp'] = "NA";
+                $cdiArr['susp_days'] = "NA";
+            } else {
+                $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
+                if (!empty($cdi_data)) {
                     $cdiArr = array();
-                    $cdiArr['b_info'] = "NA";
-                    $cdiArr['c_info'] = "NA";
-                    $cdiArr['d_info'] = "NA";
-                    $cdiArr['e_info'] = "NA";
-                    $cdiArr['susp'] = "NA";
-                    $cdiArr['susp_days'] = "NA";
+                    $cdiArr['b_info'] = $cdi_data->b_info;
+                    $cdiArr['c_info'] = $cdi_data->c_info;
+                    $cdiArr['d_info'] = $cdi_data->d_info;
+                    $cdiArr['e_info'] = $cdi_data->e_info;
+                    $cdiArr['susp'] = $cdi_data->susp;
+                    $cdiArr['susp_days'] = $cdi_data->susp_days;
+                } elseif ($value->cdi_override == "Y") {
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = 0;
+                    $cdiArr['c_info'] = 0;
+                    $cdiArr['d_info'] = 0;
+                    $cdiArr['e_info'] = 0;
+                    $cdiArr['susp'] = 0;
+                    $cdiArr['susp_days'] = 0;
+                } else {
+                    $failed = true;
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = "";
+                    $cdiArr['c_info'] = "";
+                    $cdiArr['d_info'] = "";
+                    $cdiArr['e_info'] = "";
+                    $cdiArr['susp'] = "";
+                    $cdiArr['susp_days'] = "";
                 }
+            }
+            if ($value->first_choice != "" && $value->second_choice != "") {
+
+
+                $tmp = $this->convertToArray($value);
+                $choice = getApplicationProgramName($value->first_choice);
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['second_program'] = "";
+                $tmp['score'] = $score;
+                $tmp['cdi'] = $cdiArr;
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                }
+                $tmp['rank'] = $this->priorityCalculate($value, "first");
+                $tmp['magnet_employee'] = $value->mcp_employee;
+                $tmp['magnet_program_employee'] = $value->magnet_program_employee;
+                if (!isset($this->eligibility_grade_pass[$value->id]['first'])) {
+                    $tmp['grade_status'] = "NA";
+                } else {
+                    if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
+                    }
+                }
+                //echo $value->id." - ".$value->first_offer_status . "  - ".$value->second_offer_status."<BR>";
+                if ($value->first_offer_status != "Declined & Waitlisted") {
+                    $firstdata[] = $tmp;
+                }
+
+                if (!isset($this->eligibility_grade_pass[$value->id]['second'])) {
+                    $tmp['grade_status'] = "NA";
+                } else {
+                    if ($this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
+                    }
+                }
+                $tmp['rank'] = $this->priorityCalculate($value, "second");
+
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    if ($failed == true) {
+                        $tmp['cdi_status'] = "NA";
+                    } else
+                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
+                }
+
+                $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                $tmp['first_program'] = "";
+                $tmp['score'] = $score;
+                $tmp['cdi'] = $cdiArr;
+                if ($value->second_offer_status != "Declined & Waitlisted") {
+                    $seconddata[] = $tmp;
+                }
+                //$seconddata[] = $tmp;
+
+            } elseif ($value->first_choice != "") {
+                $tmp = $this->convertToArray($value);
+                $choice = getApplicationProgramName($value->first_choice);
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['second_program'] = "";
+                $tmp['score'] = $score;
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['cdi'] = $cdiArr;
+                $tmp['rank'] = $this->priorityCalculate($value, "first");
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
                 else
-                {
-                    $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-                    if(!empty($cdi_data))
-                    {
-                        $cdiArr = array();
-                        $cdiArr['b_info'] = $cdi_data->b_info;
-                        $cdiArr['c_info'] = $cdi_data->c_info;
-                        $cdiArr['d_info'] = $cdi_data->d_info;
-                        $cdiArr['e_info'] = $cdi_data->e_info;
-                        $cdiArr['susp'] = $cdi_data->susp;
-                        $cdiArr['susp_days'] = $cdi_data->susp_days;
-                    }
-                    elseif($value->cdi_override == "Y")
-                    {
-                        $cdiArr = array();
-                        $cdiArr['b_info'] = 0;
-                        $cdiArr['c_info'] = 0;
-                        $cdiArr['d_info'] = 0;
-                        $cdiArr['e_info'] = 0;
-                        $cdiArr['susp'] = 0;
-                        $cdiArr['susp_days'] = 0;
-                    }
-                    else
-                    {
-                        $failed = true;
-                        $cdiArr = array();
-                        $cdiArr['b_info'] = "";
-                        $cdiArr['c_info'] = "";
-                        $cdiArr['d_info'] = "";
-                        $cdiArr['e_info'] = "";
-                        $cdiArr['susp'] = "";
-                        $cdiArr['susp_days'] = "";
+                        if ($failed == true) {
+                    $tmp['cdi_status'] = "NA";
+                } else
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                $tmp['magnet_employee'] = $value->mcp_employee;
+                $tmp['magnet_program_employee'] = $value->magnet_program_employee;
+                if (!isset($this->eligibility_grade_pass[$value->id]['first'])) {
+                    $tmp['grade_status'] = "NA";
+                } else {
+                    if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
                     }
                 }
-                if($value->first_choice != "" && $value->second_choice != "")
-                {
-
-
-                    $tmp = $this->convertToArray($value);
-                    $choice = getApplicationProgramName($value->first_choice);
-                    $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                    $tmp['first_choice'] = $value->first_choice;
-                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                    $tmp['second_choice'] = $value->second_choice;
-                    $tmp['second_program'] = "";
-                    $tmp['score'] = $score;
-                    $tmp['cdi'] = $cdiArr;
-                    if($value->cdi_override == "Y")
-                        $tmp['cdi_status'] = "Pass";
-                    else
-                    {
-                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                    }
-                    $tmp['rank'] = $this->priorityCalculate($value, "first");
-                    $tmp['magnet_employee'] = $value->mcp_employee;
-                    $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-                    if(!isset($this->eligibility_grade_pass[$value->id]['first']))
-                    {
-                        $tmp['grade_status'] = "NA";
-                    }
-                    else
-                    {
-                        if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                    }
-                    //echo $value->id." - ".$value->first_offer_status . "  - ".$value->second_offer_status."<BR>";
-                    if($value->first_offer_status != "Declined & Waitlisted")
-                    {
-                        $firstdata[] = $tmp;
-                    }
-
-                    if(!isset($this->eligibility_grade_pass[$value->id]['second']))
-                    {
-                        $tmp['grade_status'] = "NA";
-                    }
-                    else
-                    {
-                        if($this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                    }
-                    $tmp['rank'] = $this->priorityCalculate($value, "second");
-
-                    if($value->cdi_override == "Y")
-                        $tmp['cdi_status'] = "Pass";
-                    else
-                    {
-                        if($failed == true)
-                        {
-                            $tmp['cdi_status'] = "NA";
-                        }
-                        else
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                    }
-
-                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                    $tmp['first_program'] = "";
-                    $tmp['score'] = $score;
-                    $tmp['cdi'] = $cdiArr;
-                    if($value->second_offer_status != "Declined & Waitlisted")
-                    {
-                        $seconddata[] = $tmp;
-                    }
-                    //$seconddata[] = $tmp;
-
+                if ($value->first_offer_status != "Declined & Waitlisted") {
+                    $firstdata[] = $tmp;
                 }
-                elseif($value->first_choice != "")
-                {
-                    $tmp = $this->convertToArray($value);
-                    $choice = getApplicationProgramName($value->first_choice);
-                    $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                    $tmp['second_program'] = "";
-                    $tmp['score'] = $score;
-                    $tmp['first_choice'] = $value->first_choice;
-                    $tmp['second_choice'] = $value->second_choice;
-                    $tmp['cdi'] = $cdiArr;
-                    $tmp['rank'] = $this->priorityCalculate($value, "first");
-                    if($value->cdi_override == "Y")
-                        $tmp['cdi_status'] = "Pass";
-                    else
-                        if($failed == true)
-                        {
-                            $tmp['cdi_status'] = "NA";
-                        }
-                        else
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                    $tmp['magnet_employee'] = $value->mcp_employee;
-                    $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-                    if(!isset($this->eligibility_grade_pass[$value->id]['first']))
-                    {
-                        $tmp['grade_status'] = "NA";
-                    }
-                    else
-                    {
-                        if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                    }
-                    if($value->first_offer_status != "Declined & Waitlisted")
-                    {
-                        $firstdata[] = $tmp;
+            } else {
+                $tmp = $this->convertToArray($value);
+                $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['first_program'] = "";
+                $tmp['score'] = $score;
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['cdi'] = $cdiArr;
+                $tmp['rank'] = $this->priorityCalculate($value, "second");
+                $tmp['magnet_employee'] = $value->mcp_employee;
+                $tmp['magnet_program_employee'] = $value->magnet_program_employee;
+                if (!isset($this->eligibility_grade_pass[$value->id]['second'])) {
+                    $tmp['grade_status'] = "NA";
+                } else {
+                    if ($this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
                     }
                 }
-                else
-                {
-                    $tmp = $this->convertToArray($value);
-                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                    $tmp['first_program'] = "";
-                    $tmp['score'] = $score;
-                    $tmp['first_choice'] = $value->first_choice;
-                    $tmp['second_choice'] = $value->second_choice;
-                    $tmp['cdi'] = $cdiArr;
-                    $tmp['rank'] = $this->priorityCalculate($value, "second");
-                    $tmp['magnet_employee'] = $value->mcp_employee;
-                    $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-                    if(!isset($this->eligibility_grade_pass[$value->id]['second']))
-                    {
-                        $tmp['grade_status'] = "NA";
-                    }
-                    else
-                    {
-                        if($this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                    }
-                    if($value->cdi_override == "Y")
-                        $tmp['cdi_status'] = "Pass";
-                    else
-                    {
-                        if($failed == true)
-                        {
-                            $tmp['cdi_status'] = "NA";
-                        }
-                        else
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                    }
-
-                    if($value->second_offer_status != "Declined & Waitlisted")
-                    {
-                        $seconddata[] = $tmp;
-                    }
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    if ($failed == true) {
+                        $tmp['cdi_status'] = "NA";
+                    } else
+                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
                 }
-            
 
+                if ($value->second_offer_status != "Declined & Waitlisted") {
+                    $seconddata[] = $tmp;
+                }
+            }
         }
-//        exit;
+        //        exit;
 
-       /*
+        /*
         $fdata = array();
         $count = 0;
         foreach($firstdata as $key=>$value)
@@ -599,76 +484,64 @@ class ReportsController extends Controller
         print_r($seconddata);
        exit;*/
 
-       if(!empty($firstdata))
-       {
+        if (!empty($firstdata)) {
             $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
-            foreach($firstdata as $key=>$value)
-            {
-                $f_siblings['rank'][] = $value['rank']; 
-                $f_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+            foreach ($firstdata as $key => $value) {
+                $f_siblings['rank'][] = $value['rank'];
+                $f_lottery_numbers['lottery_number'][] = $value['lottery_number'];
             }
-            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC,$firstdata);
+            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC, $firstdata);
         }
 
-        if(!empty($seconddata))
-        {
-            foreach($seconddata as $key=>$value)
-            {
+        if (!empty($seconddata)) {
+            foreach ($seconddata as $key => $value) {
                 $s_siblings['rank'][] = $value['rank'];
-                $s_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+                $s_lottery_numbers['lottery_number'][] = $value['lottery_number'];
             }
-            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC,$seconddata);
+            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC, $seconddata);
         }
 
         $tmpAvailability = $availabilityArray;
         $waitlistArr = $offeredRank = $firstOffered = array();
 
-        foreach($firstdata as $key=>$value)
-        {
+        foreach ($firstdata as $key => $value) {
 
             $rsT = SubmissionsFinalStatus::where("submission_id", $value['id'])->select("first_choice_final_status")->first();
-            if(!empty($rsT))
+            if (!empty($rsT))
                 $status = $rsT->first_choice_final_status;
             else
                 $status = "";
-            if($value['grade_status'] == "NA" || $value['cdi_status'] == "NA")
-            {
+            if ($value['grade_status'] == "NA" || $value['cdi_status'] == "NA") {
                 $firstdata[$key]['final_status'] = "<div class='alert1 alert-info'>Denied due to Incomplete Records</div>";
-            }
-            else
-            {
-                if($status == "Offered")
+            } else {
+                if ($status == "Offered")
                     $firstdata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                elseif($status == "Waitlisted")
+                elseif ($status == "Waitlisted")
                     $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                elseif($status == "Denied due to Ineligibility")
+                elseif ($status == "Denied due to Ineligibility")
                     $firstdata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Eligibility</div>";
             }
         }
 
 
-        foreach($seconddata as $key=>$value)
-        {
+        foreach ($seconddata as $key => $value) {
 
             $rsT = SubmissionsFinalStatus::where("submission_id", $value['id'])->select("second_choice_final_status")->first();
-            if(!empty($rsT))
+            if (!empty($rsT))
                 $status = $rsT->second_choice_final_status;
             else
                 $status = "";
-            if($value['grade_status'] == "NA" || $value['cdi_status'] == "NA")
-            {
+            if ($value['grade_status'] == "NA" || $value['cdi_status'] == "NA") {
                 $seconddata[$key]['final_status'] = "<div class='alert1 alert-info'>Denied due to Incomplete Records</div>";
-            }
-            else
-            {
-                if($status == "Offered")
+            } else {
+                if ($status == "Offered")
                     $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                elseif($status == "Waitlisted")
+                elseif ($status == "Waitlisted")
                     $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                elseif($status == "Denied due to Ineligibility")
+                elseif ($status == "Denied due to Ineligibility")
                     $seconddata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Eligibility</div>";
-//                else
- //                   echo $value['id']."<BR>";
+                //                else
+                //                   echo $value['id']."<BR>";
             }
         }
 
@@ -679,63 +552,52 @@ print_r($seconddata);
 
 exit;*/
 
-        if(str_contains(request()->url(), '/export'))
-        {
+        if (str_contains(request()->url(), '/export')) {
             return $this->exportSubmissions($firstdata, $seconddata, $subjects, $terms);
-        }
-        else
-        {            
-            return view("Reports::waitlist_index",compact("firstdata", "seconddata", "existGrade", "gradeTab", "subjects", "terms", "setEligibilityData", "setCDIEligibilityData", "settings"));
+        } else {
+            return view("Reports::waitlist_index", compact("firstdata", "seconddata", "existGrade", "gradeTab", "subjects", "terms", "setEligibilityData", "setCDIEligibilityData", "settings"));
         }
     }
 
 
-    public function late_submission_index($grade=0)
+    public function late_submission_index($grade = 0)
     {
-            $rs = LateSubmissionProcessLogs::count();
-            $version = $rs + 1;
+        $rs = LateSubmissionProcessLogs::count();
+        $version = $rs + 1;
 
-            $settings = DB::table("reports_hide_option")->first();
+        $settings = DB::table("reports_hide_option")->first();
 
-            $grade_data = Submissions::distinct()->where('next_grade', '<>', '')->orderBy('next_grade', 'DESC')->get(["next_grade"]);
-            $gradeArr = array("K","1","2","3","4","5","6","7","8","9","10","11","12");
-            $fgradeTab = [];
-            foreach($grade_data as $key=>$value)
-            {
-                $fgradeTab[] = $value->next_grade;
+        $grade_data = Submissions::distinct()->where('next_grade', '<>', '')->orderBy('next_grade', 'DESC')->get(["next_grade"]);
+        $gradeArr = array("K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
+        $fgradeTab = [];
+        foreach ($grade_data as $key => $value) {
+            $fgradeTab[] = $value->next_grade;
+        }
+        $gradeTab = [];
+        foreach ($gradeArr as $key => $value) {
+            if (in_array($value, $fgradeTab))
+                $gradeTab[] = $value;
+        }
+
+        if ($grade == 0)
+            $existGrade = $gradeTab[0];
+        else
+            $existGrade = $grade;
+
+
+        $last_type = app('App\Modules\Waitlist\Controllers\WaitlistController')->check_last_process();
+        if ($last_type == "regular") {
+            $id = 0;
+        } else {
+            if ($last_type == "late_submission") {
+                $rs = LateSubmissionProcessLogs::orderBy("created_at", "DESC")->first();
+                $id = $rs->version;
+            } else {
+                $rs = WaitlistProcessLogs::orderBy("created_at", "DESC")->first();
+                $id = $rs->version;
             }
-            $gradeTab = [];
-            foreach($gradeArr as $key=>$value)
-            {
-                if(in_array($value, $fgradeTab))
-                    $gradeTab[] = $value;
-            }
-
-            if($grade == 0)
-                $existGrade = $gradeTab[0];
-            else
-                $existGrade = $grade;
-
-
-            $last_type = app('App\Modules\Waitlist\Controllers\WaitlistController')->check_last_process();
-            if($last_type == "regular")
-            {
-                $id = 0;
-            }
-            else
-            {
-                if($last_type == "late_submission")
-                {
-                    $rs = LateSubmissionProcessLogs::orderBy("created_at", "DESC")->first();
-                    $id = $rs->version;
-                }
-                else
-                {
-                    $rs = WaitlistProcessLogs::orderBy("created_at", "DESC")->first();
-                    $id = $rs->version;
-                }
-            }
-            /*$rs = LateSubmissionProcessLogs::count();
+        }
+        /*$rs = LateSubmissionProcessLogs::count();
             $version = $rs + 1;
 
             $rsWt = WaitlistProcessLogs::count();
@@ -748,131 +610,102 @@ exit;*/
                 $id = 0;
             }*/
 
-            $availabilityArray = array();
-            $parray = $garray = array();
-            $allProgram = Availability::distinct()->where("district_id", Session::get("district_id"))->get(['program_id']);
-            foreach($allProgram as $key=>$value)
-            {
-                $avail_grade = Availability::where("district_id", Session::get("district_id"))->where("program_id", $value->program_id)->get();
-                foreach($avail_grade as $gkey=>$gvalue)
-                {
-                    $offer_count = Submissions::where('district_id', Session::get("district_id"))->where(function ($q) use ($value, $gvalue){
-                                    $q->where(function ($q1)  use ($value, $gvalue){
-                                        $q1->where('first_choice_final_status', 'Offered')->where('first_offer_status', 'Accepted')->where('first_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
-                                    })->orWhere(function ($q1) use ($value, $gvalue){
-                                        $q1->where('second_choice_final_status', 'Offered')->where('second_offer_status', 'Accepted')->where('second_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
-                                    });
-                                })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->count();
+        $availabilityArray = array();
+        $parray = $garray = array();
+        $allProgram = Availability::distinct()->where("district_id", Session::get("district_id"))->get(['program_id']);
+        foreach ($allProgram as $key => $value) {
+            $avail_grade = Availability::where("district_id", Session::get("district_id"))->where("program_id", $value->program_id)->get();
+            foreach ($avail_grade as $gkey => $gvalue) {
+                $offer_count = Submissions::where('district_id', Session::get("district_id"))->where(function ($q) use ($value, $gvalue) {
+                    $q->where(function ($q1)  use ($value, $gvalue) {
+                        $q1->where('first_choice_final_status', 'Offered')->where('first_offer_status', 'Accepted')->where('first_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
+                    })->orWhere(function ($q1) use ($value, $gvalue) {
+                        $q1->where('second_choice_final_status', 'Offered')->where('second_offer_status', 'Accepted')->where('second_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
+                    });
+                })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->count();
 
 
-                    $rs = WaitlistAvailability::where("program_id", $value->program_id)->where("grade", $gvalue->grade)->first();
-                    if(!empty($rs))
-                    {
-                        $garray[] = $gvalue->grade;
-                        $parray[] = $value->program_id;
-                        $wt_count = $rs->withdrawn_seats;
-                        //$availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats + $rs->withdrawn_seats - $offer_count;
-                    }
-                    else
-                    {
-                        $wt_count = 0;
-                        //$availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats - $offer_count;
-                    }
-
-                    $rs = LateSubmissionAvailability::where("program_id", $value->program_id)->where("grade", $gvalue->grade)->first();
-                    if(!empty($rs))
-                    {
-                        $garray[] = $gvalue->grade;
-                        $parray[] = $value->program_id;
-                        $lt_count = $rs->withdrawn_seats;
-                    }
-                    else
-                    {
-                        $lt_count = 0;
-                    }
-                    $c[$value->program_id][$gvalue->grade] = $gvalue->available_seats + $wt_count + $lt_count - $offer_count;
-
+                $rs = WaitlistAvailability::where("program_id", $value->program_id)->where("grade", $gvalue->grade)->first();
+                if (!empty($rs)) {
+                    $garray[] = $gvalue->grade;
+                    $parray[] = $value->program_id;
+                    $wt_count = $rs->withdrawn_seats;
+                    //$availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats + $rs->withdrawn_seats - $offer_count;
+                } else {
+                    $wt_count = 0;
+                    //$availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats - $offer_count;
                 }
+
+                $rs = LateSubmissionAvailability::where("program_id", $value->program_id)->where("grade", $gvalue->grade)->first();
+                if (!empty($rs)) {
+                    $garray[] = $gvalue->grade;
+                    $parray[] = $value->program_id;
+                    $lt_count = $rs->withdrawn_seats;
+                } else {
+                    $lt_count = 0;
+                }
+                $c[$value->program_id][$gvalue->grade] = $gvalue->available_seats + $wt_count + $lt_count - $offer_count;
             }
+        }
 
-            //LateSubmissionFinalStatus::where("version", $version)->delete();
+        //LateSubmissionFinalStatus::where("version", $version)->delete();
 
-            $firstData = Submissions::distinct()->where("late_submission", "N")->get(["first_choice"]);
+        $firstData = Submissions::distinct()->where("late_submission", "N")->get(["first_choice"]);
 
-         /* Get Subject and Acardemic Term like Q1.1 Q1.2 etc set for Academic Grade Calculation 
+        /* Get Subject and Acardemic Term like Q1.1 Q1.2 etc set for Academic Grade Calculation 
                 For all unique First Choice and Second Choice
          */
         $subjects = $terms = array();
         $eligibilityArr = array();
-        foreach($firstData as $value)
-        {
-            if($value->first_choice != "")
-            {
+        foreach ($firstData as $value) {
+            if ($value->first_choice != "") {
                 $eligibilityData = getEligibilities($value->first_choice, 'Academic Grade Calculation');
-                if(count($eligibilityData) > 0)
-                {
-                    if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                    {
+                if (count($eligibilityData) > 0) {
+                    if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
                         $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                       // echo $eligibilityData[0]->id;exit;
+                        // echo $eligibilityData[0]->id;exit;
                         $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
 
-                        if(!empty($content))
-                        {
-                            if($content->scoring->type=="DD")
-                            {
+                        if (!empty($content)) {
+                            if ($content->scoring->type == "DD") {
                                 $tmp = array();
-                                
-                                foreach($content->subjects as $value)
-                                {
-                                    if(!in_array($value, $subjects))
-                                    {
+
+                                foreach ($content->subjects as $value) {
+                                    if (!in_array($value, $subjects)) {
                                         $subjects[] = $value;
                                     }
                                 }
 
-                                foreach($content->terms_calc as $value)
-                                {
-                                    if(!in_array($value, $terms))
-                                    {
+                                foreach ($content->terms_calc as $value) {
+                                    if (!in_array($value, $terms)) {
                                         $terms[] = $value;
                                     }
                                 }
                             }
-                        }                        
+                        }
                     }
-
                 }
             }
         }
 
         $secondData = Submissions::distinct()->where("late_submission", "N")->get(["second_choice"]);
-        foreach($secondData as $value)
-        {
-            if($value->second_choice != "")
-            {
+        foreach ($secondData as $value) {
+            if ($value->second_choice != "") {
                 $eligibilityData = getEligibilities($value->second_choice, 'Academic Grade Calculation');
-                if(count($eligibilityData) > 0)
-                {
+                if (count($eligibilityData) > 0) {
                     $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
-                    if(!empty($content))
-                    {
-                        if($content->scoring->type=="DD")
-                        {
+                    if (!empty($content)) {
+                        if ($content->scoring->type == "DD") {
                             $tmp = array();
-                            
-                            foreach($content->subjects as $value)
-                            {
-                                if(!in_array($value, $subjects))
-                                {
+
+                            foreach ($content->subjects as $value) {
+                                if (!in_array($value, $subjects)) {
                                     $subjects[] = $value;
                                 }
                             }
 
-                            foreach($content->terms_calc as $value)
-                            {
-                                if(!in_array($value, $terms))
-                                {
+                            foreach ($content->terms_calc as $value) {
+                                if (!in_array($value, $terms)) {
                                     $terms[] = $value;
                                 }
                             }
@@ -886,45 +719,33 @@ exit;*/
          */
 
         $setEligibilityData = array();
-        foreach($firstData as $value)
-        {
-            if(!in_array($value->first_choice, array_keys($setEligibilityData)))
-            {
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setEligibilityData))) {
                 $data = getSetEligibilityData($value->first_choice, 3);
-                foreach($subjects as $svalue)
-                {
-                    foreach($terms as $tvalue)
-                    {
-                        if(isset($data->{$svalue."-".$tvalue}))
-                        {
-                            $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = $data->{$svalue."-".$tvalue}[0];
+                foreach ($subjects as $svalue) {
+                    foreach ($terms as $tvalue) {
+                        if (isset($data->{$svalue . "-" . $tvalue})) {
+                            $setEligibilityData[$value->first_choice][$svalue . "-" . $tvalue] = $data->{$svalue . "-" . $tvalue}[0];
                         }
-/*                        else
+                        /*                        else
                             $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
                     }
                 }
             }
-
         }
-        foreach($secondData as $value)
-        {
-            if(!in_array($value->second_choice, array_keys($setEligibilityData)))
-            {
+        foreach ($secondData as $value) {
+            if (!in_array($value->second_choice, array_keys($setEligibilityData))) {
                 $data = getSetEligibilityData($value->second_choice, 3);
-                foreach($subjects as $svalue)
-                {
-                    foreach($terms as $tvalue)
-                    {
-                        if(isset($data->{$svalue."-".$tvalue}))
-                        {
-                            $setEligibilityData[$value->second_choice][$svalue."-".$tvalue] = $data->{$svalue."-".$tvalue}[0];
+                foreach ($subjects as $svalue) {
+                    foreach ($terms as $tvalue) {
+                        if (isset($data->{$svalue . "-" . $tvalue})) {
+                            $setEligibilityData[$value->second_choice][$svalue . "-" . $tvalue] = $data->{$svalue . "-" . $tvalue}[0];
                         }
-                     /*   else
+                        /*   else
                             $setEligibilityData[$value->second_choice][$svalue."-".$tvalue] = 50;*/
                     }
                 }
             }
-
         }
 
 
@@ -932,13 +753,10 @@ exit;*/
          */
 
         $setCDIEligibilityData = array();
-        foreach($firstData as $value)
-        {
-            if(!in_array($value->first_choice, array_keys($setCDIEligibilityData)))
-            {
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setCDIEligibilityData))) {
                 $data = getSetEligibilityData($value->first_choice, 8);
-                if(!empty($data))
-                {
+                if (!empty($data)) {
                     $setCDIEligibilityData[$value->first_choice]['b_info'] = $data->B[0];
                     $setCDIEligibilityData[$value->first_choice]['c_info'] = $data->C[0];
                     $setCDIEligibilityData[$value->first_choice]['d_info'] = $data->D[0];
@@ -948,13 +766,10 @@ exit;*/
                 }
             }
         }
-        foreach($secondData as $value)
-        {
-            if(!in_array($value->second_choice, array_keys($setCDIEligibilityData)))
-            {
+        foreach ($secondData as $value) {
+            if (!in_array($value->second_choice, array_keys($setCDIEligibilityData))) {
                 $data = getSetEligibilityData($value->second_choice, 8);
-                if(!empty($data))
-                {
+                if (!empty($data)) {
                     $setCDIEligibilityData[$value->second_choice]['b_info'] = $data->B[0];
                     $setCDIEligibilityData[$value->second_choice]['c_info'] = $data->C[0];
                     $setCDIEligibilityData[$value->second_choice]['d_info'] = $data->D[0];
@@ -965,409 +780,286 @@ exit;*/
             }
         }
 
-          if($id == 0)
-            {
-                $submissions=Submissions::
-                    where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue){
-                                    $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
-                                })->where('next_grade',$existGrade)->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_final_status.first_offer_status", "submissions_final_status.second_offer_status")
+        if ($id == 0) {
+            $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue) {
+                $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
+            })->where('next_grade', $existGrade)->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_final_status.first_offer_status", "submissions_final_status.second_offer_status")
+                ->get();
+        } else {
+            if ($last_type == "waitlist") {
+                $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue) {
+                    $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
+                })->where("submissions_waitlist_final_status.version", $id)->where('next_grade', $existGrade)->join("submissions_waitlist_final_status", "submissions_waitlist_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_waitlist_final_status.first_offer_status", "submissions_waitlist_final_status.second_offer_status")
+                    ->get();
+            } else {
+                $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue) {
+                    $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
+                })->where("late_submissions_final_status.version", $id)->where('next_grade', $existGrade)->join("late_submissions_final_status", "late_submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "late_submissions_final_status.first_offer_status", "late_submissions_final_status.second_offer_status")
                     ->get();
             }
-            else
-            {
-                if($last_type == "waitlist")
-                {
-                    $submissions=Submissions::
-                    where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue){
-                                    $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
-                                })->where("submissions_waitlist_final_status.version", $id)->where('next_grade',$existGrade)->join("submissions_waitlist_final_status", "submissions_waitlist_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_waitlist_final_status.first_offer_status", "submissions_waitlist_final_status.second_offer_status")
-                    ->get();
+        }
 
-                }
-                else
-                {
-                    $submissions=Submissions::
-                    where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue){
-                                    $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
-                                })->where("late_submissions_final_status.version", $id)->where('next_grade',$existGrade)->join("late_submissions_final_status", "late_submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "late_submissions_final_status.first_offer_status", "late_submissions_final_status.second_offer_status")
-                    ->get();
 
+
+        $decWtArry = array();
+        $firstdata = $seconddata = array();
+
+        foreach ($submissions as $key => $value) {
+            $failed = false;
+            if (!isset($programGrades[$value->first_choice_program_id])) {
+                $availableGrades = array();
+                $eligibilityData = getEligibilitiesByProgram($value->first_choice_program_id, 'Academic Grade Calculation');
+                if (isset($eligibilityData[0])) {
+                    $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
+                    $programGrades[$value->first_choice_program_id] = $availableGrades;
                 }
             }
+            $skip = false;
+            if ($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id])) {
+                $skip = true;
+            }
 
-
-
-            $decWtArry = array();
-            $firstdata = $seconddata = array();
-
-            foreach($submissions as $key=>$value)
-            {
-                    $failed = false;
-                    if(!isset($programGrades[$value->first_choice_program_id]))
-                    {
-                        $availableGrades = array();
-                        $eligibilityData = getEligibilitiesByProgram($value->first_choice_program_id, 'Academic Grade Calculation');
-                        if(isset($eligibilityData[0]))
-                        {
-                            $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
-                            $programGrades[$value->first_choice_program_id] = $availableGrades;
-                        }
-                    } 
-                    $skip = false;
-                    if($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id]))
-                    {
-                        $skip = true;
+            if ($value->second_choice_program_id != '' && $value->second_choice_program_id != '0') {
+                if (!isset($programGrades[$value->second_choice_program_id])) {
+                    $availableGrades = array();
+                    $eligibilityData = getEligibilitiesByProgram($value->second_choice_program_id, 'Academic Grade Calculation');
+                    if (isset($eligibilityData[0])) {
+                        $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
+                        $programGrades[$value->second_choice_program_id] = $availableGrades;
                     }
-
-                    if($value->second_choice_program_id != '' && $value->second_choice_program_id != '0')
-                    {
-                        if(!isset($programGrades[$value->second_choice_program_id]))
-                        {
-                            $availableGrades = array();
-                            $eligibilityData = getEligibilitiesByProgram($value->second_choice_program_id, 'Academic Grade Calculation');
-                            if(isset($eligibilityData[0]))
-                            {
-                                $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
-                                $programGrades[$value->second_choice_program_id] = $availableGrades;
-                            }
-                        } 
-                        if(!in_array($value->next_grade, $programGrades[$value->second_choice_program_id]))
-                        {
-                            $skip = true;
-                        }
-                    }
-
-                    $score = $this->collectionStudentGradeReport($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData);
-                    if(count($score) <= 0)
-                    {
-                        $failed = true;
-                        $score = array();
-                        foreach($subjects as $svalue)
-                        {
-                            foreach($terms as $svalue1)
-                            {
-                                $score[$svalue][$svalue1] = "";
-                            }
-                        }
-                    }
-
-                        if($skip)
-                        {
-                            $cdiArr = array();
-                            $cdiArr['b_info'] = "NA";
-                            $cdiArr['c_info'] = "NA";
-                            $cdiArr['d_info'] = "NA";
-                            $cdiArr['e_info'] = "NA";
-                            $cdiArr['susp'] = "NA";
-                            $cdiArr['susp_days'] = "NA";
-                        }
-                        else
-                        {
-                            $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-                            if(!empty($cdi_data))
-                            {
-                                $cdiArr = array();
-                                $cdiArr['b_info'] = $cdi_data->b_info;
-                                $cdiArr['c_info'] = $cdi_data->c_info;
-                                $cdiArr['d_info'] = $cdi_data->d_info;
-                                $cdiArr['e_info'] = $cdi_data->e_info;
-                                $cdiArr['susp'] = $cdi_data->susp;
-                                $cdiArr['susp_days'] = $cdi_data->susp_days;
-                            }
-                            elseif($value->cdi_override == "Y")
-                            {
-                                $cdiArr = array();
-                                $cdiArr['b_info'] = 0;
-                                $cdiArr['c_info'] = 0;
-                                $cdiArr['d_info'] = 0;
-                                $cdiArr['e_info'] = 0;
-                                $cdiArr['susp'] = 0;
-                                $cdiArr['susp_days'] = 0;
-                            }
-                            else
-                            {
-                                $failed = true;
-                                $cdiArr = array();
-                                $cdiArr['b_info'] = "";
-                                $cdiArr['c_info'] = "";
-                                $cdiArr['d_info'] = "";
-                                $cdiArr['e_info'] = "";
-                                $cdiArr['susp'] = "";
-                                $cdiArr['susp_days'] = "";
-                            }
-                        }
-                    if($value->first_choice != "" && $value->second_choice != "")
-                    {
-
-                        $tmp = $this->convertToArray($value);
-                        $tmp['score'] = $score;
-                        $tmp['cdi'] = $cdiArr;
-                        if($value->cdi_override == "Y")
-                            $tmp['cdi_status'] = "Pass";
-                        else
-                        {
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                        }
-
-                        $choice = getApplicationProgramName($value->first_choice);
-                        $tmp['late_submission'] = "No";
-                        $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                        $tmp['first_choice'] = $value->first_choice;
-                        $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                        $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                        $tmp['second_choice'] = $value->second_choice;
-                        $tmp['magnet_employee'] = $value->mcp_employee;
-                        $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-
-                        $tmp['second_program'] = "";
-                        $tmp['rank'] = $this->priorityCalculate($value, "first");
-                        if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                        if($value->first_offer_status != "Declined & Waitlisted")
-                        {
-                            $firstdata[] = $tmp;
-                        }
-                        if($value->cdi_override == "Y")
-                            $tmp['cdi_status'] = "Pass";
-                        else
-                        {
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                        }
-                        
-
-                        $tmp['rank'] = $this->priorityCalculate($value, "second");
-                        if($this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                        $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                        $tmp['first_program'] = "";
-                        if($value->second_offer_status != "Declined & Waitlisted")
-                        {
-                            $seconddata[] = $tmp;
-                        }
-
-                        
-                    }
-                    elseif($value->first_choice != "")
-                    {
-                        $tmp = $this->convertToArray($value);
-                        $tmp['score'] = $score;
-                        $tmp['cdi'] = $cdiArr;
-                        $choice = getApplicationProgramName($value->first_choice);
-                        $tmp['late_submission'] = "No";
-                        $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                        $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                        $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                        $tmp['second_program'] = "";
-                        $tmp['first_choice'] = $value->first_choice;
-                        $tmp['second_choice'] = $value->second_choice;
-                        $tmp['rank'] = $this->priorityCalculate($value, "first");
-                        if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                        $tmp['magnet_employee'] = $value->mcp_employee;
-                        $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-                        if($value->cdi_override == "Y")
-                            $tmp['cdi_status'] = "Pass";
-                        else
-                        {
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                        }
-                        if($value->first_offer_status != "Declined & Waitlisted")
-                        {
-                            $firstdata[] = $tmp;
-                        }
-                    }
-                    else
-                    {
-                        $tmp = $this->convertToArray($value);
-                        $tmp['score'] = $score;
-                        $tmp['cdi'] = $cdiArr;
-                        $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                        $tmp['late_submission'] = "No";
-                        $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                        $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                        $tmp['first_program'] = "";
-                        $tmp['first_choice'] = $value->first_choice;
-                        $tmp['second_choice'] = $value->second_choice;
-                        $tmp['magnet_employee'] = $value->mcp_employee;
-                        $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-                        $tmp['rank'] = $this->priorityCalculate($value, "second");
-                        if($this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                        if($value->cdi_override == "Y")
-                            $tmp['cdi_status'] = "Pass";
-                        else
-                        {
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                        }
-                        if($value->second_offer_status != "Declined & Waitlisted")
-                        {
-                            $seconddata[] = $tmp;
-                        }
-                    }            
                 }
-
-            if(!empty($firstdata))
-            {
-                $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
-                foreach($firstdata as $key=>$value)
-                {
-                    $f_siblings['rank'][] = $value['rank']; 
-                    $f_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+                if (!in_array($value->next_grade, $programGrades[$value->second_choice_program_id])) {
+                    $skip = true;
                 }
-                array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC,$firstdata);
             }
 
-            if(!empty($seconddata))
-            {
-                foreach($seconddata as $key=>$value)
-                {
-                    $s_siblings['rank'][] = $value['rank'];
-                    $s_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
-                }
-                array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC,$seconddata);
-            }
-
-            if(count($firstdata) > 0)
-            {
-                $final_first_data = $firstdata;
-            }
-            else
-            {
-                $final_first_data = array();
-            }
-            if(count($seconddata) > 0)
-            {
-                $final_second_data = $seconddata;
-            }
-            else
-            {
-                $final_second_data = array();
-            }
-
-           
-
-
-
-            /* Code for Late Submissions */
-            $firstdata = $seconddata = array();
-            
-           // $subjects = $terms = array();
-            $eligibilityArr = array();
-
-            $firstData = Submissions::distinct()->where("late_submission", "Y")->get(["first_choice"]);
-            //print_r($parray);
-//            $secondData = Submissions::distinct()->where("late_submission", "Y")->whereIn("second_choice_program_id", $parray)->whereIn("next_grade", $garray)->get(["first_choice"]);
-
-            foreach($firstData as $value)
-            {
-                if($value->first_choice != "")
-                {
-                    //echo "FC".$value->first_choice."<BR>";
-                    $eligibilityData = getEligibilitiesLateSubmission($value->first_choice, 'Academic Grade Calculation');
-
-                    if(count($eligibilityData) > 0)
-                    {
-                        if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                        {
-                            $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                           // echo $eligibilityData[0]->id;exit;
-                            $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
-
-                      //      print_r($content);
-                       //     echo "<BR><BR><BR>---------------------------------------------------------<BR><BR><BR>";
-                            if(!empty($content))
-                            {
-                                if($content->scoring->type=="DD" || $content->scoring->type=="CLSG")
-                                {
-                                    $tmp = array();
-                                    
-                                    foreach($content->subjects as $svalue)
-                                    {
-                                        if(!in_array($svalue, $subjects))
-                                        {
-                                            $subjects[] = $svalue;
-                                        }
-                                    }
-
-                                    $str = "";
-                                    foreach($content->terms_calc as $svalue)
-                                    {
-                                        $str .= $svalue."-";
-                                    }
-                                    $str = trim($str, "-");
-
-                                    if(!in_array($str, $terms))
-                                    {
-                                        $terms[] = $str;
-                                    }
-
-                                    
-                                }
-                            }                        
-                        }
-
+            $score = $this->collectionStudentGradeReport($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData);
+            if (count($score) <= 0) {
+                $failed = true;
+                $score = array();
+                foreach ($subjects as $svalue) {
+                    foreach ($terms as $svalue1) {
+                        $score[$svalue][$svalue1] = "";
                     }
                 }
             }
 
-            $secondData = Submissions::distinct()->where("late_submission", "Y")->get(["second_choice"]);
-            foreach($secondData as $value)
-            {
-                if($value->second_choice != "")
-                {
-                    $eligibilityData = getEligibilitiesLateSubmission($value->second_choice, 'Academic Grade Calculation');
-                    if(count($eligibilityData) > 0)
-                    {
+            if ($skip) {
+                $cdiArr = array();
+                $cdiArr['b_info'] = "NA";
+                $cdiArr['c_info'] = "NA";
+                $cdiArr['d_info'] = "NA";
+                $cdiArr['e_info'] = "NA";
+                $cdiArr['susp'] = "NA";
+                $cdiArr['susp_days'] = "NA";
+            } else {
+                $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
+                if (!empty($cdi_data)) {
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = $cdi_data->b_info;
+                    $cdiArr['c_info'] = $cdi_data->c_info;
+                    $cdiArr['d_info'] = $cdi_data->d_info;
+                    $cdiArr['e_info'] = $cdi_data->e_info;
+                    $cdiArr['susp'] = $cdi_data->susp;
+                    $cdiArr['susp_days'] = $cdi_data->susp_days;
+                } elseif ($value->cdi_override == "Y") {
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = 0;
+                    $cdiArr['c_info'] = 0;
+                    $cdiArr['d_info'] = 0;
+                    $cdiArr['e_info'] = 0;
+                    $cdiArr['susp'] = 0;
+                    $cdiArr['susp_days'] = 0;
+                } else {
+                    $failed = true;
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = "";
+                    $cdiArr['c_info'] = "";
+                    $cdiArr['d_info'] = "";
+                    $cdiArr['e_info'] = "";
+                    $cdiArr['susp'] = "";
+                    $cdiArr['susp_days'] = "";
+                }
+            }
+            if ($value->first_choice != "" && $value->second_choice != "") {
+
+                $tmp = $this->convertToArray($value);
+                $tmp['score'] = $score;
+                $tmp['cdi'] = $cdiArr;
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                }
+
+                $choice = getApplicationProgramName($value->first_choice);
+                $tmp['late_submission'] = "No";
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['magnet_employee'] = $value->mcp_employee;
+                $tmp['magnet_program_employee'] = $value->magnet_program_employee;
+
+                $tmp['second_program'] = "";
+                $tmp['rank'] = $this->priorityCalculate($value, "first");
+                if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                    $tmp['grade_status'] = "Pass";
+                } else {
+                    $tmp['grade_status'] = "Fail";
+                }
+                if ($value->first_offer_status != "Declined & Waitlisted") {
+                    $firstdata[] = $tmp;
+                }
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
+                }
+
+
+                $tmp['rank'] = $this->priorityCalculate($value, "second");
+                if ($this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                    $tmp['grade_status'] = "Pass";
+                } else {
+                    $tmp['grade_status'] = "Fail";
+                }
+                $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                $tmp['first_program'] = "";
+                if ($value->second_offer_status != "Declined & Waitlisted") {
+                    $seconddata[] = $tmp;
+                }
+            } elseif ($value->first_choice != "") {
+                $tmp = $this->convertToArray($value);
+                $tmp['score'] = $score;
+                $tmp['cdi'] = $cdiArr;
+                $choice = getApplicationProgramName($value->first_choice);
+                $tmp['late_submission'] = "No";
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['second_program'] = "";
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['rank'] = $this->priorityCalculate($value, "first");
+                if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                    $tmp['grade_status'] = "Pass";
+                } else {
+                    $tmp['grade_status'] = "Fail";
+                }
+                $tmp['magnet_employee'] = $value->mcp_employee;
+                $tmp['magnet_program_employee'] = $value->magnet_program_employee;
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                }
+                if ($value->first_offer_status != "Declined & Waitlisted") {
+                    $firstdata[] = $tmp;
+                }
+            } else {
+                $tmp = $this->convertToArray($value);
+                $tmp['score'] = $score;
+                $tmp['cdi'] = $cdiArr;
+                $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                $tmp['late_submission'] = "No";
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['first_program'] = "";
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['magnet_employee'] = $value->mcp_employee;
+                $tmp['magnet_program_employee'] = $value->magnet_program_employee;
+                $tmp['rank'] = $this->priorityCalculate($value, "second");
+                if ($this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                    $tmp['grade_status'] = "Pass";
+                } else {
+                    $tmp['grade_status'] = "Fail";
+                }
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
+                }
+                if ($value->second_offer_status != "Declined & Waitlisted") {
+                    $seconddata[] = $tmp;
+                }
+            }
+        }
+
+        if (!empty($firstdata)) {
+            $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
+            foreach ($firstdata as $key => $value) {
+                $f_siblings['rank'][] = $value['rank'];
+                $f_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC, $firstdata);
+        }
+
+        if (!empty($seconddata)) {
+            foreach ($seconddata as $key => $value) {
+                $s_siblings['rank'][] = $value['rank'];
+                $s_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC, $seconddata);
+        }
+
+        if (count($firstdata) > 0) {
+            $final_first_data = $firstdata;
+        } else {
+            $final_first_data = array();
+        }
+        if (count($seconddata) > 0) {
+            $final_second_data = $seconddata;
+        } else {
+            $final_second_data = array();
+        }
+
+
+
+
+
+        /* Code for Late Submissions */
+        $firstdata = $seconddata = array();
+
+        // $subjects = $terms = array();
+        $eligibilityArr = array();
+
+        $firstData = Submissions::distinct()->where("late_submission", "Y")->get(["first_choice"]);
+        //print_r($parray);
+        //            $secondData = Submissions::distinct()->where("late_submission", "Y")->whereIn("second_choice_program_id", $parray)->whereIn("next_grade", $garray)->get(["first_choice"]);
+
+        foreach ($firstData as $value) {
+            if ($value->first_choice != "") {
+                //echo "FC".$value->first_choice."<BR>";
+                $eligibilityData = getEligibilitiesLateSubmission($value->first_choice, 'Academic Grade Calculation');
+
+                if (count($eligibilityData) > 0) {
+                    if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
+                        $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
+                        // echo $eligibilityData[0]->id;exit;
                         $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
-                                                //print_r($content);
-                            //echo "<BR><BR><BR>---------------------------------------------------------<BR><BR><BR>";
 
-                        if(!empty($content))
-                        {
-                            if($content->scoring->type=="DD" || $content->scoring->type=="CLSG")
-                            {
+                        //      print_r($content);
+                        //     echo "<BR><BR><BR>---------------------------------------------------------<BR><BR><BR>";
+                        if (!empty($content)) {
+                            if ($content->scoring->type == "DD" || $content->scoring->type == "CLSG") {
                                 $tmp = array();
-                                
-                                foreach($content->subjects as $svalue)
-                                {
-                                    if(!in_array($svalue, $subjects))
-                                    {
-                                        $subjects[] = $value;
+
+                                foreach ($content->subjects as $svalue) {
+                                    if (!in_array($svalue, $subjects)) {
+                                        $subjects[] = $svalue;
                                     }
                                 }
 
                                 $str = "";
-                                foreach($content->terms_calc as $svalue)
-                                {
-                                    $str .= $svalue."-";
+                                foreach ($content->terms_calc as $svalue) {
+                                    $str .= $svalue . "-";
                                 }
                                 $str = trim($str, "-");
-                                if(!in_array($str, $terms))
-                                {
+
+                                if (!in_array($str, $terms)) {
                                     $terms[] = $str;
                                 }
                             }
@@ -1375,120 +1067,128 @@ exit;*/
                     }
                 }
             }
-    //exit;
-            //print_r($parray);exit;
+        }
 
-            /* Get Set Eligibility Data Set for first choice program and second choice program
-             */
+        $secondData = Submissions::distinct()->where("late_submission", "Y")->get(["second_choice"]);
+        foreach ($secondData as $value) {
+            if ($value->second_choice != "") {
+                $eligibilityData = getEligibilitiesLateSubmission($value->second_choice, 'Academic Grade Calculation');
+                if (count($eligibilityData) > 0) {
+                    $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
+                    //print_r($content);
+                    //echo "<BR><BR><BR>---------------------------------------------------------<BR><BR><BR>";
 
-            $setEligibilityData1 = array();
-            foreach($firstData as $value)
-            {
-                if(!in_array($value->first_choice, array_keys($setEligibilityData1)))
-                {
-                    $data = getSetEligibilityDataLS($value->first_choice, 3);
-                    foreach($subjects as $svalue)
-                    {
-                        $str = "";
-                        foreach($terms as $tvalue)
-                        {
-                            if($tvalue != "Q4.4 Final Grade")
-                            {
-                            $str .= $tvalue."-";
+                    if (!empty($content)) {
+                        if ($content->scoring->type == "DD" || $content->scoring->type == "CLSG") {
+                            $tmp = array();
 
+                            foreach ($content->subjects as $svalue) {
+                                if (!in_array($svalue, $subjects)) {
+                                    $subjects[] = $value;
+                                }
                             }
-    /*                        else
-                                $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
-                        }
-                        $str = trim($str, "-");
-                        $str = str_replace(" Qtr Grade", "", $str);
-                       
 
-                        if(isset($data->{$svalue."-".$str}))
-                        {
-                            $setEligibilityData1[$value->first_choice][$svalue."-".$str] = $data->{$svalue."-".$str}[0];
-                        }
-                    }
-                }
-
-            }
-            foreach($secondData as $value)
-            {
-                if(!in_array($value->second_choice, array_keys($setEligibilityData1)))
-                {
-                    $data = getSetEligibilityDataLS($value->second_choice, 3);
-                    foreach($subjects as $svalue)
-                    {
-                        $str = "";
-                        if($tvalue != "Q4.4 Final Grade")
-                        {
-                        $str .= $tvalue."-";
-                            
-                        }
-
-                        $str = trim($str, "-");
-                        $str = str_replace(" Qtr Grade", "", $str);
-
-                        if(isset($data->{$svalue."-".$str}))
-                        {
-                            $setEligibilityData1[$value->first_choice][$svalue."-".$str] = $data->{$svalue."-".$str}[0];
+                            $str = "";
+                            foreach ($content->terms_calc as $svalue) {
+                                $str .= $svalue . "-";
+                            }
+                            $str = trim($str, "-");
+                            if (!in_array($str, $terms)) {
+                                $terms[] = $str;
+                            }
                         }
                     }
                 }
-
             }
-                //print_r($setEligibilityData1);exit;
+        }
+        //exit;
+        //print_r($parray);exit;
 
-            /* Get CDI Set Eligibility Data Set for first choice program and second choice program
+        /* Get Set Eligibility Data Set for first choice program and second choice program
              */
 
-                $setCDIEligibilityData = array();
-                foreach($firstData as $value)
-                {
-                    if(!in_array($value->first_choice, array_keys($setCDIEligibilityData)))
-                    {
-                        $data = getSetEligibilityDataLS($value->first_choice, 8);
-                        if(!empty($data))
-                        {
-                            $setCDIEligibilityData[$value->first_choice]['b_info'] = $data->B[0];
-                            $setCDIEligibilityData[$value->first_choice]['c_info'] = $data->C[0];
-                            $setCDIEligibilityData[$value->first_choice]['d_info'] = $data->D[0];
-                            $setCDIEligibilityData[$value->first_choice]['e_info'] = $data->E[0];
-                            $setCDIEligibilityData[$value->first_choice]['susp'] = $data->Susp[0];
-                            $setCDIEligibilityData[$value->first_choice]['susp_days'] = $data->SuspDays[0];
+        $setEligibilityData1 = array();
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setEligibilityData1))) {
+                $data = getSetEligibilityDataLS($value->first_choice, 3);
+                foreach ($subjects as $svalue) {
+                    $str = "";
+                    foreach ($terms as $tvalue) {
+                        if ($tvalue != "Q4.4 Final Grade") {
+                            $str .= $tvalue . "-";
                         }
+                        /*                        else
+                                $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
                     }
-                }
-            foreach($secondData as $value)
-            {
-                if(!in_array($value->second_choice, array_keys($setCDIEligibilityData)))
-                {
-                    $data = getSetEligibilityDataLS($value->second_choice, 8);
-                    if(!empty($data))
-                    {
-                        $setCDIEligibilityData[$value->second_choice]['b_info'] = $data->B[0];
-                        $setCDIEligibilityData[$value->second_choice]['c_info'] = $data->C[0];
-                        $setCDIEligibilityData[$value->second_choice]['d_info'] = $data->D[0];
-                        $setCDIEligibilityData[$value->second_choice]['e_info'] = $data->E[0];
-                        $setCDIEligibilityData[$value->second_choice]['susp'] = $data->Susp[0];
-                        $setCDIEligibilityData[$value->second_choice]['susp_days'] = $data->SuspDays[0];
-                    }
-                }
-            }
-            /* Get CDI Data */
-            if($version == 1)
-            {
-                $submissions=Submissions::
-                    where('submissions.district_id', Session::get('district_id'))->where("late_submission", "Y")->where('next_grade',$existGrade)->select("submissions.*")->where('submission_status', '<>', 'Application Withdrawn')
-                    ->get();
-            }
-            else
-            {
-                $submissions=Submissions::
-                    where('submissions.district_id', Session::get('district_id'))->where("late_submission", "Y")->where('next_grade',$existGrade)->join("late_submission_final_status", "late_submission_final_status.submission_id", "submissions.id")->select("submissions.*", "late_submission_final_status.first_offer_status", "late_submission_final_status.second_offer_status")->where('submission_status', '<>', 'Application Withdrawn')->where("version", $version)->get();
-            }
+                    $str = trim($str, "-");
+                    $str = str_replace(" Qtr Grade", "", $str);
 
-           /* $submissions=Submissions::
+
+                    if (isset($data->{$svalue . "-" . $str})) {
+                        $setEligibilityData1[$value->first_choice][$svalue . "-" . $str] = $data->{$svalue . "-" . $str}[0];
+                    }
+                }
+            }
+        }
+        foreach ($secondData as $value) {
+            if (!in_array($value->second_choice, array_keys($setEligibilityData1))) {
+                $data = getSetEligibilityDataLS($value->second_choice, 3);
+                foreach ($subjects as $svalue) {
+                    $str = "";
+                    if ($tvalue != "Q4.4 Final Grade") {
+                        $str .= $tvalue . "-";
+                    }
+
+                    $str = trim($str, "-");
+                    $str = str_replace(" Qtr Grade", "", $str);
+
+                    if (isset($data->{$svalue . "-" . $str})) {
+                        $setEligibilityData1[$value->first_choice][$svalue . "-" . $str] = $data->{$svalue . "-" . $str}[0];
+                    }
+                }
+            }
+        }
+        //print_r($setEligibilityData1);exit;
+
+        /* Get CDI Set Eligibility Data Set for first choice program and second choice program
+             */
+
+        $setCDIEligibilityData = array();
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setCDIEligibilityData))) {
+                $data = getSetEligibilityDataLS($value->first_choice, 8);
+                if (!empty($data)) {
+                    $setCDIEligibilityData[$value->first_choice]['b_info'] = $data->B[0];
+                    $setCDIEligibilityData[$value->first_choice]['c_info'] = $data->C[0];
+                    $setCDIEligibilityData[$value->first_choice]['d_info'] = $data->D[0];
+                    $setCDIEligibilityData[$value->first_choice]['e_info'] = $data->E[0];
+                    $setCDIEligibilityData[$value->first_choice]['susp'] = $data->Susp[0];
+                    $setCDIEligibilityData[$value->first_choice]['susp_days'] = $data->SuspDays[0];
+                }
+            }
+        }
+        foreach ($secondData as $value) {
+            if (!in_array($value->second_choice, array_keys($setCDIEligibilityData))) {
+                $data = getSetEligibilityDataLS($value->second_choice, 8);
+                if (!empty($data)) {
+                    $setCDIEligibilityData[$value->second_choice]['b_info'] = $data->B[0];
+                    $setCDIEligibilityData[$value->second_choice]['c_info'] = $data->C[0];
+                    $setCDIEligibilityData[$value->second_choice]['d_info'] = $data->D[0];
+                    $setCDIEligibilityData[$value->second_choice]['e_info'] = $data->E[0];
+                    $setCDIEligibilityData[$value->second_choice]['susp'] = $data->Susp[0];
+                    $setCDIEligibilityData[$value->second_choice]['susp_days'] = $data->SuspDays[0];
+                }
+            }
+        }
+        /* Get CDI Data */
+        if ($version == 1) {
+            $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))->where("late_submission", "Y")->where('next_grade', $existGrade)->select("submissions.*")->where('submission_status', '<>', 'Application Withdrawn')
+                ->get();
+        } else {
+            $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))->where("late_submission", "Y")->where('next_grade', $existGrade)->join("late_submission_final_status", "late_submission_final_status.submission_id", "submissions.id")->select("submissions.*", "late_submission_final_status.first_offer_status", "late_submission_final_status.second_offer_status")->where('submission_status', '<>', 'Application Withdrawn')->where("version", $version)->get();
+        }
+
+        /* $submissions=Submissions::
                 where('submissions.district_id', Session::get('district_id'))
                 ->where("late_submission", "Y")
                 ->where("next_grade", $existGrade)
@@ -1496,259 +1196,211 @@ exit;*/
     //            ->limit(5)
                 ->get();*/
 
-            $firstdata = $seconddata = array();
-            $programGrades = array();
-            foreach($submissions as $key=>$value)
-            {
-                if(!isset($programGrades[$value->first_choice_program_id]))
-                {
+        $firstdata = $seconddata = array();
+        $programGrades = array();
+        foreach ($submissions as $key => $value) {
+            if (!isset($programGrades[$value->first_choice_program_id])) {
+                $availableGrades = array();
+                $eligibilityData = getEligibilitiesByProgramLateSubmission($value->first_choice_program_id, 'Academic Grade Calculation');
+                if (isset($eligibilityData[0])) {
+                    $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
+                    $programGrades[$value->first_choice_program_id] = $availableGrades;
+                }
+            }
+            $skip = false;
+            if ($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id])) {
+                $skip = true;
+            }
+
+            if ($value->second_choice_program_id != '' && $value->second_choice_program_id != '0') {
+                if (!isset($programGrades[$value->second_choice_program_id])) {
                     $availableGrades = array();
-                    $eligibilityData = getEligibilitiesByProgramLateSubmission($value->first_choice_program_id, 'Academic Grade Calculation');
-                    if(isset($eligibilityData[0]))
-                    {
-                        $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
-                        $programGrades[$value->first_choice_program_id] = $availableGrades;
+                    $eligibilityData = getEligibilitiesByProgramLateSubmission($value->second_choice_program_id, 'Academic Grade Calculation');
+                    if (isset($eligibilityData[0])) {
+                        $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
+                        $programGrades[$value->second_choice_program_id] = $availableGrades;
                     }
-                } 
-                $skip = false;
-                if($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id]))
-                {
+                }
+                if (!in_array($value->next_grade, $programGrades[$value->second_choice_program_id])) {
                     $skip = true;
                 }
-
-                if($value->second_choice_program_id != '' && $value->second_choice_program_id != '0')
-                {
-                    if(!isset($programGrades[$value->second_choice_program_id]))
-                    {
-                        $availableGrades = array();
-                        $eligibilityData = getEligibilitiesByProgramLateSubmission($value->second_choice_program_id, 'Academic Grade Calculation');
-                        if(isset($eligibilityData[0]))
-                        {
-                            $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
-                            $programGrades[$value->second_choice_program_id] = $availableGrades;
-                        }
-                    } 
-                    if(!in_array($value->next_grade, $programGrades[$value->second_choice_program_id]))
-                    {
-                        $skip = true;
-                    }
-                }
-
-                $score = $this->collectionStudentGradeReportLateSubmission($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData1);
-         //print_r($terms);exit;
-               if(count($score) <= 0)
-                    {
-                        $failed = true;
-                        $score = array();
-                        foreach($subjects as $svalue)
-                        {
-                            foreach($terms as $svalue1)
-                            {
-                                $score[$svalue][$svalue1] = "";
-                            }
-                        }
-                    }
-
-                        if($skip)
-                        {
-                            $cdiArr = array();
-                            $cdiArr['b_info'] = "NA";
-                            $cdiArr['c_info'] = "NA";
-                            $cdiArr['d_info'] = "NA";
-                            $cdiArr['e_info'] = "NA";
-                            $cdiArr['susp'] = "NA";
-                            $cdiArr['susp_days'] = "NA";
-                        }
-                        else
-                        {
-                            $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-                            if(!empty($cdi_data))
-                            {
-                                $cdiArr = array();
-                                $cdiArr['b_info'] = $cdi_data->b_info;
-                                $cdiArr['c_info'] = $cdi_data->c_info;
-                                $cdiArr['d_info'] = $cdi_data->d_info;
-                                $cdiArr['e_info'] = $cdi_data->e_info;
-                                $cdiArr['susp'] = $cdi_data->susp;
-                                $cdiArr['susp_days'] = $cdi_data->susp_days;
-                            }
-                            elseif($value->cdi_override == "Y")
-                            {
-                                $cdiArr = array();
-                                $cdiArr['b_info'] = 0;
-                                $cdiArr['c_info'] = 0;
-                                $cdiArr['d_info'] = 0;
-                                $cdiArr['e_info'] = 0;
-                                $cdiArr['susp'] = 0;
-                                $cdiArr['susp_days'] = 0;
-                            }
-                            else
-                            {
-                                $failed = true;
-                                $cdiArr = array();
-                                $cdiArr['b_info'] = "";
-                                $cdiArr['c_info'] = "";
-                                $cdiArr['d_info'] = "";
-                                $cdiArr['e_info'] = "";
-                                $cdiArr['susp'] = "";
-                                $cdiArr['susp_days'] = "";
-                            }
-                        }
-                    if($value->first_choice != "" && $value->second_choice != "")
-                    {
-
-                        $tmp = $this->convertToArray($value);
-                        $tmp['score'] = $score;
-                        $tmp['cdi'] = $cdiArr;
-                        if($value->cdi_override == "Y")
-                            $tmp['cdi_status'] = "Pass";
-                        else
-                        {
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                        }
-
-                        $choice = getApplicationProgramName($value->first_choice);
-                        $tmp['late_submission'] = "Yes";
-                        $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                        $tmp['first_choice'] = $value->first_choice;
-                        $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                        $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                        $tmp['second_choice'] = $value->second_choice;
-                        $tmp['magnet_employee'] = $value->mcp_employee;
-                        $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-
-                        $tmp['second_program'] = "";
-                        $tmp['rank'] = $this->priorityCalculate($value, "first");
-                        if(isset($this->eligibility_grade_pass[$value->id]['first']) && $this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                        $firstdata[] = $tmp;
-                        if($value->cdi_override == "Y")
-                            $tmp['cdi_status'] = "Pass";
-                        else
-                        {
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                        }
-                        
-
-                        $tmp['rank'] = $this->priorityCalculate($value, "second");
-                        if(isset($this->eligibility_grade_pass[$value->id]['second']) && $this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                        $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                        $tmp['first_program'] = "";
-                        $seconddata[] = $tmp;
-                    }
-                    elseif($value->first_choice != "")
-                    {
-                        $tmp = $this->convertToArray($value);
-                        $tmp['score'] = $score;
-                        $tmp['cdi'] = $cdiArr;
-                        $choice = getApplicationProgramName($value->first_choice);
-                        $tmp['late_submission'] = "Yes";
-                        $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                        $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                        $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                        $tmp['second_program'] = "";
-                        $tmp['first_choice'] = $value->first_choice;
-                        $tmp['second_choice'] = $value->second_choice;
-                        $tmp['rank'] = $this->priorityCalculate($value, "first");
-                        if(isset($this->eligibility_grade_pass[$value->id]['first']) && $this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                        $tmp['magnet_employee'] = $value->mcp_employee;
-                        $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-                        if($value->cdi_override == "Y")
-                            $tmp['cdi_status'] = "Pass";
-                        else
-                        {
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                        }
-                        $firstdata[] = $tmp;
-                    }
-                    else
-                    {
-                        $tmp = $this->convertToArray($value);
-                        $tmp['score'] = $score;
-                        $tmp['cdi'] = $cdiArr;
-                        $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                        $tmp['late_submission'] = "Yes";
-                        $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                        $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                        $tmp['first_program'] = "";
-                        $tmp['first_choice'] = $value->first_choice;
-                        $tmp['second_choice'] = $value->second_choice;
-                        $tmp['magnet_employee'] = $value->mcp_employee;
-                        $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-                        $tmp['rank'] = $this->priorityCalculate($value, "second");
-                        if(isset($this->eligibility_grade_pass[$value->id]['second']) && $this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                        if($value->cdi_override == "Y")
-                            $tmp['cdi_status'] = "Pass";
-                        else
-                        {
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                        }
-                        $seconddata[] = $tmp;
-                    } 
             }
 
-           if(!empty($firstdata))
-           {
-                $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
-                foreach($firstdata as $key=>$value)
-                {
-                    $f_siblings['rank'][] = $value['rank']; 
-                    $f_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+            $score = $this->collectionStudentGradeReportLateSubmission($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData1);
+            //print_r($terms);exit;
+            if (count($score) <= 0) {
+                $failed = true;
+                $score = array();
+                foreach ($subjects as $svalue) {
+                    foreach ($terms as $svalue1) {
+                        $score[$svalue][$svalue1] = "";
+                    }
                 }
-                array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC,$firstdata);
             }
 
-            if(!empty($seconddata))
-            {
-                foreach($seconddata as $key=>$value)
-                {
-                    $s_siblings['rank'][] = $value['rank'];
-                    $s_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+            if ($skip) {
+                $cdiArr = array();
+                $cdiArr['b_info'] = "NA";
+                $cdiArr['c_info'] = "NA";
+                $cdiArr['d_info'] = "NA";
+                $cdiArr['e_info'] = "NA";
+                $cdiArr['susp'] = "NA";
+                $cdiArr['susp_days'] = "NA";
+            } else {
+                $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
+                if (!empty($cdi_data)) {
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = $cdi_data->b_info;
+                    $cdiArr['c_info'] = $cdi_data->c_info;
+                    $cdiArr['d_info'] = $cdi_data->d_info;
+                    $cdiArr['e_info'] = $cdi_data->e_info;
+                    $cdiArr['susp'] = $cdi_data->susp;
+                    $cdiArr['susp_days'] = $cdi_data->susp_days;
+                } elseif ($value->cdi_override == "Y") {
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = 0;
+                    $cdiArr['c_info'] = 0;
+                    $cdiArr['d_info'] = 0;
+                    $cdiArr['e_info'] = 0;
+                    $cdiArr['susp'] = 0;
+                    $cdiArr['susp_days'] = 0;
+                } else {
+                    $failed = true;
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = "";
+                    $cdiArr['c_info'] = "";
+                    $cdiArr['d_info'] = "";
+                    $cdiArr['e_info'] = "";
+                    $cdiArr['susp'] = "";
+                    $cdiArr['susp_days'] = "";
                 }
-                array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC,$seconddata);
             }
-            $final_first_data = array_merge($final_first_data, $firstdata);
-            $final_second_data = array_merge($final_second_data, $seconddata);
+            if ($value->first_choice != "" && $value->second_choice != "") {
 
-            $firstdata = $final_first_data;
-            $seconddata = $final_second_data;
+                $tmp = $this->convertToArray($value);
+                $tmp['score'] = $score;
+                $tmp['cdi'] = $cdiArr;
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                }
 
-        if(str_contains(request()->url(), '/export'))
-        {
+                $choice = getApplicationProgramName($value->first_choice);
+                $tmp['late_submission'] = "Yes";
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['magnet_employee'] = $value->mcp_employee;
+                $tmp['magnet_program_employee'] = $value->magnet_program_employee;
+
+                $tmp['second_program'] = "";
+                $tmp['rank'] = $this->priorityCalculate($value, "first");
+                if (isset($this->eligibility_grade_pass[$value->id]['first']) && $this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                    $tmp['grade_status'] = "Pass";
+                } else {
+                    $tmp['grade_status'] = "Fail";
+                }
+                $firstdata[] = $tmp;
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
+                }
+
+
+                $tmp['rank'] = $this->priorityCalculate($value, "second");
+                if (isset($this->eligibility_grade_pass[$value->id]['second']) && $this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                    $tmp['grade_status'] = "Pass";
+                } else {
+                    $tmp['grade_status'] = "Fail";
+                }
+                $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                $tmp['first_program'] = "";
+                $seconddata[] = $tmp;
+            } elseif ($value->first_choice != "") {
+                $tmp = $this->convertToArray($value);
+                $tmp['score'] = $score;
+                $tmp['cdi'] = $cdiArr;
+                $choice = getApplicationProgramName($value->first_choice);
+                $tmp['late_submission'] = "Yes";
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['second_program'] = "";
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['rank'] = $this->priorityCalculate($value, "first");
+                if (isset($this->eligibility_grade_pass[$value->id]['first']) && $this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                    $tmp['grade_status'] = "Pass";
+                } else {
+                    $tmp['grade_status'] = "Fail";
+                }
+                $tmp['magnet_employee'] = $value->mcp_employee;
+                $tmp['magnet_program_employee'] = $value->magnet_program_employee;
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                }
+                $firstdata[] = $tmp;
+            } else {
+                $tmp = $this->convertToArray($value);
+                $tmp['score'] = $score;
+                $tmp['cdi'] = $cdiArr;
+                $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                $tmp['late_submission'] = "Yes";
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['first_program'] = "";
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['magnet_employee'] = $value->mcp_employee;
+                $tmp['magnet_program_employee'] = $value->magnet_program_employee;
+                $tmp['rank'] = $this->priorityCalculate($value, "second");
+                if (isset($this->eligibility_grade_pass[$value->id]['second']) && $this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                    $tmp['grade_status'] = "Pass";
+                } else {
+                    $tmp['grade_status'] = "Fail";
+                }
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
+                }
+                $seconddata[] = $tmp;
+            }
+        }
+
+        if (!empty($firstdata)) {
+            $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
+            foreach ($firstdata as $key => $value) {
+                $f_siblings['rank'][] = $value['rank'];
+                $f_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC, $firstdata);
+        }
+
+        if (!empty($seconddata)) {
+            foreach ($seconddata as $key => $value) {
+                $s_siblings['rank'][] = $value['rank'];
+                $s_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC, $seconddata);
+        }
+        $final_first_data = array_merge($final_first_data, $firstdata);
+        $final_second_data = array_merge($final_second_data, $seconddata);
+
+        $firstdata = $final_first_data;
+        $seconddata = $final_second_data;
+
+        if (str_contains(request()->url(), '/export')) {
             return $this->exportSubmissions($firstdata, $seconddata, $subjects, $terms);
+        } else {
+            return view("Reports::late_submission_index", compact("firstdata", "seconddata", "existGrade", "gradeTab", "subjects", "terms", "setEligibilityData", "setCDIEligibilityData", "settings"));
         }
-        else
-        {            
-            return view("Reports::late_submission_index",compact("firstdata", "seconddata", "existGrade", "gradeTab", "subjects", "terms", "setEligibilityData", "setCDIEligibilityData", "settings"));
-        }
-
     }
 
     public function processingLogsReport()
@@ -1760,7 +1412,7 @@ exit;*/
         $msg = "";
         $last_online_date = date("Y-m-d H:i:s", strtotime($date->value));
 
-        return view("Reports::log_index",compact("versions_lists", "process_selecton", "late_lists", "last_online_date"));
+        return view("Reports::log_index", compact("versions_lists", "process_selecton", "late_lists", "last_online_date"));
     }
 
     public function processingRealLogsReport()
@@ -1769,17 +1421,12 @@ exit;*/
         $versions_lists = WaitlistProcessLogs::orderBy("created_at", "desc")->first();
         $late_lists = LateSubmissionProcessLogs::orderBy("created_at", "desc")->first();
 
-        if(!empty($late_lists))
-        {
-            return redirect(url('/admin/LateSubmission/SeatsStatus/Version/'.$late_lists->version));   
-        }
-        elseif(!empty($versions_lists))
-        {
-            return redirect(url('/admin/Waitlist/SeatsStatus/Version/'.$versions_lists->version));   
-        }
-        else
-        {
-            return redirect(url('/admin/Reports/missing/'.$process_selecton->enrollment_id.'/seatstatus'));   
+        if (!empty($late_lists)) {
+            return redirect(url('/admin/LateSubmission/SeatsStatus/Version/' . $late_lists->version));
+        } elseif (!empty($versions_lists)) {
+            return redirect(url('/admin/Waitlist/SeatsStatus/Version/' . $versions_lists->version));
+        } else {
+            return redirect(url('/admin/Reports/missing/' . $process_selecton->enrollment_id . '/seatstatus'));
         }
         //return view("Reports::real_log_index",compact("versions_lists", "process_selecton", "late_lists"));
     }
@@ -1791,83 +1438,67 @@ exit;*/
 
         $availabilityArray = array();
         $allProgram = Availability::distinct()->where("district_id", Session::get("district_id"))->get(['program_id']);
-        foreach($allProgram as $key=>$value)
-        {
+        foreach ($allProgram as $key => $value) {
             $avail_grade = Availability::where("district_id", Session::get("district_id"))->where("program_id", $value->program_id)->get();
-            foreach($avail_grade as $gkey=>$gvalue)
-            {
-                $offer_count = Submissions::where('district_id', Session::get("district_id"))->where(function ($q) use ($value, $gvalue){
-                                $q->where(function ($q1)  use ($value, $gvalue){
-                                    $q1->where('first_choice_final_status', 'Offered')->where('first_offer_status', 'Accepted')->where('first_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
-                                })->orWhere(function ($q1) use ($value, $gvalue){
-                                    $q1->where('second_choice_final_status', 'Offered')->where('second_offer_status', 'Accepted')->where('second_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
-                                });
-                            })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->count();
+            foreach ($avail_grade as $gkey => $gvalue) {
+                $offer_count = Submissions::where('district_id', Session::get("district_id"))->where(function ($q) use ($value, $gvalue) {
+                    $q->where(function ($q1)  use ($value, $gvalue) {
+                        $q1->where('first_choice_final_status', 'Offered')->where('first_offer_status', 'Accepted')->where('first_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
+                    })->orWhere(function ($q1) use ($value, $gvalue) {
+                        $q1->where('second_choice_final_status', 'Offered')->where('second_offer_status', 'Accepted')->where('second_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
+                    });
+                })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->count();
 
 
                 $rs = WaitlistAvailability::where("program_id", $value->program_id)->where("grade", $gvalue->grade)->first();
-                if(!empty($rs))
-                {
+                if (!empty($rs)) {
                     $availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats + $rs->withdrawn_seats - $offer_count;
-                }
-                else
-                {
+                } else {
                     $availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats - $offer_count;
                 }
             }
         }
 
-        $submissions=Submissions::
-            where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue){
-                                $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
-                            })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_final_status.first_offer_status", "submissions_final_status.second_offer_status")
+        $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue) {
+            $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
+        })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_final_status.first_offer_status", "submissions_final_status.second_offer_status")
             ->get();
 
         $decWtArry = array();
-        foreach($submissions as $key=>$value)
-        {
-            if($value->first_choice != "" && $value->second_choice != "")
-            {
+        foreach ($submissions as $key => $value) {
+            if ($value->first_choice != "" && $value->second_choice != "") {
 
                 $tmp = $this->convertToArray($value);
                 $choice = getApplicationProgramName($value->first_choice);
-                $tmp['first_program'] =getApplicationProgramName($value->first_choice);
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
                 $tmp['first_choice'] = $value->first_choice;
                 $tmp['first_choice_program_id'] = $value->first_choice_program_id;
                 $tmp['second_choice_program_id'] = $value->second_choice_program_id;
                 $tmp['second_choice'] = $value->second_choice;
                 $tmp['second_program'] = "";
                 $tmp['rank'] = $this->priorityCalculate($value, "first");
-                 if($value->first_offer_status != "Declined & Waitlisted")
-                {
+                if ($value->first_offer_status != "Declined & Waitlisted") {
                     $firstdata[] = $tmp;
                 }
 
                 $tmp['rank'] = $this->priorityCalculate($value, "second");
                 $tmp['second_program'] = getApplicationProgramName($value->second_choice);
                 $tmp['first_program'] = "";
-                if($value->second_offer_status != "Declined & Waitlisted")
-                {
+                if ($value->second_offer_status != "Declined & Waitlisted") {
                     $seconddata[] = $tmp;
                 }
-            }
-            elseif($value->first_choice != "")
-            {
+            } elseif ($value->first_choice != "") {
                 $tmp = $this->convertToArray($value);
                 $choice = getApplicationProgramName($value->first_choice);
-                $tmp['first_program'] =getApplicationProgramName($value->first_choice);
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
                 $tmp['first_choice_program_id'] = $value->first_choice_program_id;
                 $tmp['second_choice_program_id'] = $value->second_choice_program_id;
                 $tmp['second_program'] = "";
                 $tmp['rank'] = $this->priorityCalculate($value, "first");
-                if($value->first_offer_status != "Declined & Waitlisted")
-                {
+                if ($value->first_offer_status != "Declined & Waitlisted") {
                     $firstdata[] = $tmp;
                 }
- 
-            }
-            else
-            {
+            } else {
                 $tmp = $this->convertToArray($value);
                 $tmp['second_program'] = getApplicationProgramName($value->second_choice);
                 $tmp['first_choice_program_id'] = $value->first_choice_program_id;
@@ -1876,1054 +1507,779 @@ exit;*/
                 $tmp['first_choice'] = $value->first_choice;
                 $tmp['second_choice'] = $value->second_choice;
                 $tmp['rank'] = $this->priorityCalculate($value, "second");
-                if($value->second_offer_status != "Declined & Waitlisted")
-                {
+                if ($value->second_offer_status != "Declined & Waitlisted") {
                     $seconddata[] = $tmp;
                 }
             }
         }
 
-        if(!empty($firstdata))
-    {
-        $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
-        foreach($firstdata as $key=>$value)
-        {
-            $f_siblings['rank'][] = $value['rank']; 
-            $f_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+        if (!empty($firstdata)) {
+            $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
+            foreach ($firstdata as $key => $value) {
+                $f_siblings['rank'][] = $value['rank'];
+                $f_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC, $firstdata);
         }
-        array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC,$firstdata);
-    }
 
-    if(!empty($seconddata))
-    {
-        foreach($seconddata as $key=>$value)
-        {
-            $s_siblings['rank'][] = $value['rank'];
-            $s_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+        if (!empty($seconddata)) {
+            foreach ($seconddata as $key => $value) {
+                $s_siblings['rank'][] = $value['rank'];
+                $s_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC, $seconddata);
         }
-        array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC,$seconddata);
-    }
 
         $tmpAvailability = $availabilityArray;
         $waitlistArr = $offeredRank = $firstOffered = array();
-        foreach($firstdata as $key=>$value)
-        {
-            if(isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']]))
-            {
+        foreach ($firstdata as $key => $value) {
+            if (isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']])) {
 
-                if($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0)
-                {
+                if ($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0) {
                     $firstdata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
                     $firstOffered[] = $value['id'];
-                    if(isset($offeredRank[$value['first_choice_program_id']]))
-                    {
+                    if (isset($offeredRank[$value['first_choice_program_id']])) {
                         $offeredRank[$value['first_choice_program_id']] = $offeredRank[$value['first_choice_program_id']] + 1;
-                    }
-                    else
-                    {
+                    } else {
                         $offeredRank[$value['first_choice_program_id']] = 1;
                     }
 
                     $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] - 1;
-                    do
-                    {
+                    do {
                         $code = mt_rand(100000, 999999);
                         $user_code = SubmissionsWaitlistFinalStatus::where('offer_slug', $code)->first();
-                    }
-                    while(!empty($user_code));      
-                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Offered", "first_offered_rank"=> $offeredRank[$value['first_choice_program_id']], "first_waitlist_for"=>$value['first_choice_program_id'], 'offer_slug'=>$code, "version"=>$version]);
-                }
-                else
-                {
+                    } while (!empty($user_code));
+                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Offered", "first_offered_rank" => $offeredRank[$value['first_choice_program_id']], "first_waitlist_for" => $value['first_choice_program_id'], 'offer_slug' => $code, "version" => $version]);
+                } else {
                     $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                    if(isset($waitlistArr[$value['first_choice_program_id']]))
-                    {
+                    if (isset($waitlistArr[$value['first_choice_program_id']])) {
                         $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
-                    }
-                    else
-                    {
+                    } else {
                         $waitlistArr[$value['first_choice_program_id']] = 1;
                     }
 
-                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']], "version"=>$version]);
-
-
-                }    
-            }
-            else
-            {
-                $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                if(isset($waitlistArr[$value['first_choice_program_id']]))
-                {
-                    $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']], "version" => $version]);
                 }
-                else
-                {
+            } else {
+                $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                if (isset($waitlistArr[$value['first_choice_program_id']])) {
+                    $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                } else {
                     $waitlistArr[$value['first_choice_program_id']] = 1;
                 }
-                $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']], "version"=>$version]);
-
+                $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']], "version" => $version]);
             }
         }
 
-        foreach($seconddata as $key=>$value)
-        {
-            
-                if(isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']]))
-                {
-                    if($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered))
-                    {
-                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                        $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
+        foreach ($seconddata as $key => $value) {
 
-                        if(isset($offeredRank[$value['second_choice_program_id']]))
-                        {
-                            $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $offeredRank[$value['second_choice_program_id']] = 1;
-                        }
-                        do
-                        {
-                            $code = mt_rand(100000, 999999);
-                            $user_code = SubmissionsWaitlistFinalStatus::where('offer_slug', $code)->first();
-                        }
-                        while(!empty($user_code));    
+            if (isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']])) {
+                if ($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered)) {
+                    $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
+                    $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
 
-                        $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Offered", "second_offered_rank"=> $offeredRank[$value['second_choice_program_id']], "second_waitlist_for"=>$value['second_choice_program_id'], 'offer_slug'=>$code, "version"=>$version]);
-
-
+                    if (isset($offeredRank[$value['second_choice_program_id']])) {
+                        $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
+                    } else {
+                        $offeredRank[$value['second_choice_program_id']] = 1;
                     }
-                    else
-                    {
-                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                        if(isset($waitlistArr[$value['second_choice_program_id']]))
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = 1;
-                        }
+                    do {
+                        $code = mt_rand(100000, 999999);
+                        $user_code = SubmissionsWaitlistFinalStatus::where('offer_slug', $code)->first();
+                    } while (!empty($user_code));
 
-                        $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']], "version"=>$version]);
-
-                    }    
-                }
-                else
-                {
+                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Offered", "second_offered_rank" => $offeredRank[$value['second_choice_program_id']], "second_waitlist_for" => $value['second_choice_program_id'], 'offer_slug' => $code, "version" => $version]);
+                } else {
                     $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                    if(isset($waitlistArr[$value['second_choice_program_id']]))
-                    {
+                    if (isset($waitlistArr[$value['second_choice_program_id']])) {
                         $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                    }
-                    else
-                    {
+                    } else {
                         $waitlistArr[$value['second_choice_program_id']] = 1;
                     }
-                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']], "version"=>$version]);
 
+                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']], "version" => $version]);
                 }
+            } else {
+                $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                if (isset($waitlistArr[$value['second_choice_program_id']])) {
+                    $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
+                } else {
+                    $waitlistArr[$value['second_choice_program_id']] = 1;
+                }
+                $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']], "version" => $version]);
+            }
         }
         echo "Done";
-
-
     }
 
     /* Late Submission Individual Submissions */
     public function generateLateSubmissionIndividualStatus()
     {
-            $rs = LateSubmissionProcessLogs::count();
-            $version = $rs + 1;
+        $rs = LateSubmissionProcessLogs::count();
+        $version = $rs + 1;
 
-            $rsWt = WaitlistProcessLogs::count();
-            if($rsWt > 0)
-            {
-                $id = WaitlistProcessLogs::orderBy("created_at", "DESC")->first()->version;
+        $rsWt = WaitlistProcessLogs::count();
+        if ($rsWt > 0) {
+            $id = WaitlistProcessLogs::orderBy("created_at", "DESC")->first()->version;
+        } else {
+            $id = 0;
+        }
+
+        $availabilityArray = array();
+        $parray = $garray = array();
+        $allProgram = Availability::distinct()->where("district_id", Session::get("district_id"))->get(['program_id']);
+        foreach ($allProgram as $key => $value) {
+            $avail_grade = Availability::where("district_id", Session::get("district_id"))->where("program_id", $value->program_id)->get();
+            foreach ($avail_grade as $gkey => $gvalue) {
+                $offer_count = app('App\Modules\Waitlist\Controllers\WaitlistController')->get_offer_count($value->program_id, $gvalue->grade, Session::get("district_id"), 1);
+
+
+                $rs = WaitlistAvailability::where("program_id", $value->program_id)->where("grade", $gvalue->grade)->first();
+                if (!empty($rs)) {
+                    $garray[] = $gvalue->grade;
+                    $parray[] = $value->program_id;
+                    $wt_count = $rs->withdrawn_seats;
+                    //$availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats + $rs->withdrawn_seats - $offer_count;
+                } else {
+                    $wt_count = 0;
+                    //$availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats - $offer_count;
+                }
+
+                $rs = LateSubmissionAvailability::where("program_id", $value->program_id)->where("grade", $gvalue->grade)->first();
+                if (!empty($rs)) {
+                    $garray[] = $gvalue->grade;
+                    $parray[] = $value->program_id;
+                    $lt_count = $rs->withdrawn_seats;
+                } else {
+                    $lt_count = 0;
+                }
+                $availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats + $wt_count + $lt_count - $offer_count;
             }
-            else
-            {
-                $id = 0;
-            }
+        }
 
-            $availabilityArray = array();
-            $parray = $garray = array();
-            $allProgram = Availability::distinct()->where("district_id", Session::get("district_id"))->get(['program_id']);
-            foreach($allProgram as $key=>$value)
-            {
-                $avail_grade = Availability::where("district_id", Session::get("district_id"))->where("program_id", $value->program_id)->get();
-                foreach($avail_grade as $gkey=>$gvalue)
-                {
-                    $offer_count = app('App\Modules\Waitlist\Controllers\WaitlistController')->get_offer_count($value->program_id, $gvalue->grade, Session::get("district_id"), 1);
+        LateSubmissionFinalStatus::where("version", $version)->delete();
 
+        if ($id == 0) {
+            $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue) {
+                $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
+            })->where(function ($q) use ($parray) {
+                $q->whereIn("first_choice_program_id", $parray)->orWhereIn("second_choice_program_id", $parray);
+            })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_final_status.first_offer_status", "submissions_final_status.second_offer_status")
+                ->get();
+        } else {
+            $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue) {
+                $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
+            })->where(function ($q) use ($parray) {
+                $q->whereIn("first_choice_program_id", $parray)->orWhereIn("second_choice_program_id", $parray);
+            })->join("submissions_waitlist_final_status", "submissions_waitlist_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_waitlist_final_status.first_offer_status", "submissions_waitlist_final_status.second_offer_status")
+                ->get();
+        }
+        $decWtArry = array();
+        foreach ($submissions as $key => $value) {
+            if (in_array($value->next_grade, $garray)) {
+                if ($value->first_choice != "" && $value->second_choice != "") {
 
-                    $rs = WaitlistAvailability::where("program_id", $value->program_id)->where("grade", $gvalue->grade)->first();
-                    if(!empty($rs))
-                    {
-                        $garray[] = $gvalue->grade;
-                        $parray[] = $value->program_id;
-                        $wt_count = $rs->withdrawn_seats;
-                        //$availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats + $rs->withdrawn_seats - $offer_count;
+                    $tmp = $this->convertToArray($value);
+                    $choice = getApplicationProgramName($value->first_choice);
+                    $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                    $tmp['first_choice'] = $value->first_choice;
+                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                    $tmp['second_choice'] = $value->second_choice;
+                    $tmp['second_program'] = "";
+                    $tmp['rank'] = $this->priorityCalculate($value, "first");
+                    if ($value->first_offer_status != "Declined & Waitlisted") {
+                        $firstdata[] = $tmp;
                     }
+
+                    $tmp['rank'] = $this->priorityCalculate($value, "second");
+                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                    $tmp['first_program'] = "";
+                    if ($value->second_offer_status != "Declined & Waitlisted") {
+                        $seconddata[] = $tmp;
+                    }
+                } elseif ($value->first_choice != "") {
+                    $tmp = $this->convertToArray($value);
+                    $choice = getApplicationProgramName($value->first_choice);
+                    $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                    $tmp['second_program'] = "";
+                    $tmp['rank'] = $this->priorityCalculate($value, "first");
+                    if ($value->first_offer_status != "Declined & Waitlisted") {
+                        $firstdata[] = $tmp;
+                    }
+                } else {
+                    $tmp = $this->convertToArray($value);
+                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                    $tmp['first_program'] = "";
+                    $tmp['first_choice'] = $value->first_choice;
+                    $tmp['second_choice'] = $value->second_choice;
+                    $tmp['rank'] = $this->priorityCalculate($value, "second");
+                    if ($value->second_offer_status != "Declined & Waitlisted") {
+                        $seconddata[] = $tmp;
+                    }
+                }
+            }
+        }
+
+        if (!empty($firstdata)) {
+            $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
+            foreach ($firstdata as $key => $value) {
+                $f_siblings['rank'][] = $value['rank'];
+                $f_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC, $firstdata);
+        }
+
+        if (!empty($seconddata)) {
+            foreach ($seconddata as $key => $value) {
+                $s_siblings['rank'][] = $value['rank'];
+                $s_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC, $seconddata);
+        }
+
+
+        $tmpAvailability = $availabilityArray;
+        $waitlistArr = $offeredRank = $firstOffered = array();
+        foreach ($firstdata as $key => $value) {
+            if (isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']])) {
+
+                if ($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0 && in_array($value['first_choice_program_id'], $parray)) {
+                    $firstdata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
+                    $firstOffered[] = $value['id'];
+                    if (isset($offeredRank[$value['first_choice_program_id']])) {
+                        $offeredRank[$value['first_choice_program_id']] = $offeredRank[$value['first_choice_program_id']] + 1;
+                    } else {
+                        $offeredRank[$value['first_choice_program_id']] = 1;
+                    }
+
+                    $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] - 1;
+                    do {
+                        $code = mt_rand(100000, 999999);
+                        $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
+                    } while (!empty($user_code));
+                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Offered", "first_offered_rank" => $offeredRank[$value['first_choice_program_id']], "first_waitlist_for" => $value['first_choice_program_id'], 'offer_slug' => $code, "version" => $version]);
+                } else {
+                    $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                    if (isset($waitlistArr[$value['first_choice_program_id']])) {
+                        $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                    } else {
+                        $waitlistArr[$value['first_choice_program_id']] = 1;
+                    }
+
+                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']], "version" => $version]);
+                }
+            } else {
+                $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                if (isset($waitlistArr[$value['first_choice_program_id']])) {
+                    $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                } else {
+                    $waitlistArr[$value['first_choice_program_id']] = 1;
+                }
+                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']], "version" => $version]);
+            }
+        }
+
+        foreach ($seconddata as $key => $value) {
+
+            if (isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']])) {
+                if ($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered)  && in_array($value['second_choice_program_id'], $parray)) {
+                    $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
+                    $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
+
+                    if (isset($offeredRank[$value['second_choice_program_id']])) {
+                        $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
+                    } else {
+                        $offeredRank[$value['second_choice_program_id']] = 1;
+                    }
+                    do {
+                        $code = mt_rand(100000, 999999);
+                        $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
+                    } while (!empty($user_code));
+
+                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Offered", "second_offered_rank" => $offeredRank[$value['second_choice_program_id']], "second_waitlist_for" => $value['second_choice_program_id'], 'offer_slug' => $code, "version" => $version]);
+                } else {
+                    $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                    if (isset($waitlistArr[$value['second_choice_program_id']])) {
+                        $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
+                    } else {
+                        $waitlistArr[$value['second_choice_program_id']] = 1;
+                    }
+
+                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']], "version" => $version]);
+                }
+            } else {
+                $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                if (isset($waitlistArr[$value['second_choice_program_id']])) {
+                    $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
+                } else {
+                    $waitlistArr[$value['second_choice_program_id']] = 1;
+                }
+                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']], "version" => $version]);
+            }
+        }
+
+
+        /* Code for Late Submissions */
+        $firstdata = $seconddata = array();
+
+        $subjects = $terms = array();
+        $eligibilityArr = array();
+
+        $firstData = Submissions::distinct()->where("late_submission", "Y")->where(function ($q) use ($parray) {
+            $q->whereIn("first_choice_program_id", $parray)->orWhereIn("second_choice_program_id", $parray);
+        })->whereIn("next_grade", $garray)->get(["first_choice", "second_choice"]);
+        //print_r($parray);
+        //            $secondData = Submissions::distinct()->where("late_submission", "Y")->whereIn("second_choice_program_id", $parray)->whereIn("next_grade", $garray)->get(["first_choice"]);
+
+        foreach ($firstData as $value) {
+
+
+            if ($value->first_choice != "") {
+                //echo "FC".$value->first_choice."<BR>";
+                $eligibilityData = getEligibilitiesLateSubmission($value->first_choice, 'Academic Grade Calculation');
+
+                if (count($eligibilityData) > 0) {
+                    if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
+                        $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
+                        // echo $eligibilityData[0]->id;exit;
+                        $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
+
+                        //      print_r($content);
+                        //     echo "<BR><BR><BR>---------------------------------------------------------<BR><BR><BR>";
+                        if (!empty($content)) {
+                            if ($content->scoring->type == "DD" || $content->scoring->type == "CLSG" || $content->scoring->type == "GA") {
+                                $tmp = array();
+
+                                foreach ($content->subjects as $svalue) {
+                                    if (!in_array($svalue, $subjects)) {
+                                        $subjects[] = $svalue;
+                                    }
+                                }
+
+                                $str = "";
+                                foreach ($content->terms_calc as $svalue) {
+                                    $str .= $svalue . "-";
+                                }
+                                $str = trim($str, "-");
+
+                                if (!in_array($str, $terms)) {
+                                    $terms[] = $str;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if ($value->second_choice != "") {
+                //echo "FC".$value->first_choice."<BR>";
+                $eligibilityData = getEligibilitiesLateSubmission($value->second_choice, 'Academic Grade Calculation');
+
+                if (count($eligibilityData) > 0) {
+                    if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
+                        $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
+                        // echo $eligibilityData[0]->id;exit;
+                        $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
+
+                        //      print_r($content);
+                        //     echo "<BR><BR><BR>---------------------------------------------------------<BR><BR><BR>";
+                        if (!empty($content)) {
+                            if ($content->scoring->type == "DD" || $content->scoring->type == "CLSG" || $content->scoring->type == "GA") {
+                                $tmp = array();
+
+                                foreach ($content->subjects as $svalue) {
+                                    if (!in_array($svalue, $subjects)) {
+                                        $subjects[] = $svalue;
+                                    }
+                                }
+
+                                $str = "";
+                                foreach ($content->terms_calc as $svalue) {
+                                    $str .= $svalue . "-";
+                                }
+                                $str = trim($str, "-");
+
+                                if (!in_array($str, $terms)) {
+                                    $terms[] = $str;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        //exit;
+        //print_r($parray);exit;
+
+        /* Get Set Eligibility Data Set for first choice program and second choice program
+             */
+
+        $setEligibilityData = array();
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setEligibilityData))) {
+                $data = getSetEligibilityDataLS($value->first_choice, 3);
+                foreach ($subjects as $svalue) {
+                    $str = "";
+                    foreach ($terms as $tvalue) {
+                        $str .= $tvalue . "-";
+                        /*                        else
+                                $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
+                    }
+                    $str = trim($str, "-");
+                    $str = str_replace(" Qtr Grade", "", $str);
+                    if (isset($data->{$svalue . "-" . $str})) {
+                        $setEligibilityData[$value->first_choice][$svalue . "-" . $str] = $data->{$svalue . "-" . $str}[0];
+                    }
+                }
+            }
+
+            if (!in_array($value->second_choice, array_keys($setEligibilityData))) {
+                $data = getSetEligibilityDataLS($value->second_choice, 3);
+                foreach ($subjects as $svalue) {
+                    $str = "";
+                    foreach ($terms as $tvalue) {
+                        $str .= $tvalue . "-";
+                        /*                        else
+                                $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
+                    }
+                    $str = trim($str, "-");
+                    $str = str_replace(" Qtr Grade", "", $str);
+                    if (isset($data->{$svalue . "-" . $str})) {
+                        $setEligibilityData[$value->second_choice][$svalue . "-" . $str] = $data->{$svalue . "-" . $str}[0];
+                    }
+                }
+            }
+        }
+
+        //print_r($terms);exit;
+
+        /* Get CDI Set Eligibility Data Set for first choice program and second choice program
+             */
+
+        $setCDIEligibilityData = array();
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setCDIEligibilityData))) {
+                $data = getSetEligibilityData($value->first_choice, 8);
+                if (!empty($data)) {
+                    $setCDIEligibilityData[$value->first_choice]['b_info'] = $data->B[0];
+                    $setCDIEligibilityData[$value->first_choice]['c_info'] = $data->C[0];
+                    $setCDIEligibilityData[$value->first_choice]['d_info'] = $data->D[0];
+                    $setCDIEligibilityData[$value->first_choice]['e_info'] = $data->E[0];
+                    $setCDIEligibilityData[$value->first_choice]['susp'] = $data->Susp[0];
+                    $setCDIEligibilityData[$value->first_choice]['susp_days'] = $data->SuspDays[0];
+                }
+            }
+            if (!in_array($value->second_choice, array_keys($setCDIEligibilityData))) {
+                $data = getSetEligibilityData($value->second_choice, 8);
+                if (!empty($data)) {
+                    $setCDIEligibilityData[$value->second_choice]['b_info'] = $data->B[0];
+                    $setCDIEligibilityData[$value->second_choice]['c_info'] = $data->C[0];
+                    $setCDIEligibilityData[$value->second_choice]['d_info'] = $data->D[0];
+                    $setCDIEligibilityData[$value->second_choice]['e_info'] = $data->E[0];
+                    $setCDIEligibilityData[$value->second_choice]['susp'] = $data->Susp[0];
+                    $setCDIEligibilityData[$value->second_choice]['susp_days'] = $data->SuspDays[0];
+                }
+            }
+        }
+        /* Get CDI Data */
+
+        $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))
+            ->where("late_submission", "Y")
+            ->where(function ($q) use ($parray) {
+                $q->whereIn("first_choice_program_id", $parray)->orWhereIn("second_choice_program_id", $parray);
+            })
+            ->whereIn("next_grade", $garray)
+            ->whereIn('submission_status', array('Active', 'Pending'))
+            //            ->limit(5)
+            ->get();
+
+        $firstdata = $seconddata = array();
+        $programGrades = array();
+        foreach ($submissions as $key => $value) {
+            if (!isset($programGrades[$value->first_choice_program_id])) {
+                $availableGrades = array();
+                $eligibilityData = getEligibilitiesByProgramLateSubmission($value->first_choice_program_id, 'Academic Grade Calculation');
+                if (isset($eligibilityData[0])) {
+                    $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
+                    $programGrades[$value->first_choice_program_id] = $availableGrades;
+                }
+            }
+            $skip = false;
+            if ($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id])) {
+                $skip = true;
+            }
+
+            if ($value->second_choice_program_id != '' && $value->second_choice_program_id != '0') {
+                if (!isset($programGrades[$value->second_choice_program_id])) {
+                    $availableGrades = array();
+                    $eligibilityData = getEligibilitiesByProgramLateSubmission($value->second_choice_program_id, 'Academic Grade Calculation');
+                    if (isset($eligibilityData[0])) {
+                        $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
+                        $programGrades[$value->second_choice_program_id] = $availableGrades;
+                    }
+                }
+                if (!in_array($value->next_grade, $programGrades[$value->second_choice_program_id])) {
+                    $skip = true;
+                }
+            }
+            $score = $this->collectionStudentGradeReportLateSubmission($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData);
+
+            if (count($score) > 0) {
+
+                if ($skip) {
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = "NA";
+                    $cdiArr['c_info'] = "NA";
+                    $cdiArr['d_info'] = "NA";
+                    $cdiArr['e_info'] = "NA";
+                    $cdiArr['susp'] = "NA";
+                    $cdiArr['susp_days'] = "NA";
+                } else {
+                    $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
+                    if (!empty($cdi_data)) {
+                        $cdiArr = array();
+                        $cdiArr['b_info'] = $cdi_data->b_info;
+                        $cdiArr['c_info'] = $cdi_data->c_info;
+                        $cdiArr['d_info'] = $cdi_data->d_info;
+                        $cdiArr['e_info'] = $cdi_data->e_info;
+                        $cdiArr['susp'] = $cdi_data->susp;
+                        $cdiArr['susp_days'] = $cdi_data->susp_days;
+                    } elseif ($value->cdi_override == "Y") {
+                        $cdiArr = array();
+                        $cdiArr['b_info'] = 0;
+                        $cdiArr['c_info'] = 0;
+                        $cdiArr['d_info'] = 0;
+                        $cdiArr['e_info'] = 0;
+                        $cdiArr['susp'] = 0;
+                        $cdiArr['susp_days'] = 0;
+                    } else {
+                        $incomplete_reason = "CDI";
+                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value->id, "version" => $version], ["first_choice_final_status" => "Denied Due To Incomplete Records", "first_offered_rank" => 0, "first_waitlist_for" => $value['first_choice_program_id'], "second_choice_final_status" => "Denied Due To Incomplete Records", "second_offered_rank" => 0, "second_waitlist_for" => $value['second_choice_program_id'], 'incomplete_reason' => $incomplete_reason, "version" => $version]);
+                        continue;
+                    }
+                }
+                if ($value->first_choice != "" && $value->second_choice != "") {
+
+                    $tmp = $this->convertToArray($value);
+                    $choice = getApplicationProgramName($value->first_choice);
+                    $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                    $tmp['first_choice'] = $value->first_choice;
+                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                    $tmp['second_choice'] = $value->second_choice;
+                    $tmp['second_program'] = "";
+                    $tmp['score'] = $score;
+                    $tmp['cdi'] = $cdiArr;
+                    if ($value->cdi_override == "Y")
+                        $tmp['cdi_status'] = "Pass";
+                    else {
+                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                    }
+                    $tmp['rank'] = $this->priorityCalculate($value, "first");
+                    if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
+                    }
+                    $firstdata[] = $tmp;
+
+                    if ($this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
+                    }
+                    $tmp['rank'] = $this->priorityCalculate($value, "second");
+                    if ($value->cdi_override == "Y")
+                        $tmp['cdi_status'] = "Pass";
                     else
-                    {
-                        $wt_count = 0;
-                        //$availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats - $offer_count;
-                    }
-
-                    $rs = LateSubmissionAvailability::where("program_id", $value->program_id)->where("grade", $gvalue->grade)->first();
-                    if(!empty($rs))
-                    {
-                        $garray[] = $gvalue->grade;
-                        $parray[] = $value->program_id;
-                        $lt_count = $rs->withdrawn_seats;
-                    }
+                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
+                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                    $tmp['first_program'] = "";
+                    $tmp['score'] = $score;
+                    $tmp['cdi'] = $cdiArr;
+                    $seconddata[] = $tmp;
+                } elseif ($value->first_choice != "") {
+                    $tmp = $this->convertToArray($value);
+                    $choice = getApplicationProgramName($value->first_choice);
+                    $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                    $tmp['second_program'] = "";
+                    $tmp['score'] = $score;
+                    $tmp['first_choice'] = $value->first_choice;
+                    $tmp['second_choice'] = $value->second_choice;
+                    $tmp['cdi'] = $cdiArr;
+                    $tmp['rank'] = $this->priorityCalculate($value, "first");
+                    if ($value->cdi_override == "Y")
+                        $tmp['cdi_status'] = "Pass";
                     else
-                    {
-                        $lt_count = 0;
+                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                    if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
                     }
-                    $availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats + $wt_count + $lt_count - $offer_count;
-
-                }
-            }
-
-            LateSubmissionFinalStatus::where("version", $version)->delete();
-
-            if($id == 0)
-            {
-                $submissions=Submissions::
-                    where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue){
-                                    $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
-                                })->where(function ($q) use ($parray){
-                                    $q->whereIn("first_choice_program_id", $parray)->orWhereIn("second_choice_program_id", $parray);
-                                })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_final_status.first_offer_status", "submissions_final_status.second_offer_status")
-                    ->get();
-            }
-            else
-            {
-                $submissions=Submissions::
-                    where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue){
-                                    $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
-                                })->where(function ($q) use ($parray){
-                                    $q->whereIn("first_choice_program_id", $parray)->orWhereIn("second_choice_program_id", $parray);
-                                })->join("submissions_waitlist_final_status", "submissions_waitlist_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_waitlist_final_status.first_offer_status", "submissions_waitlist_final_status.second_offer_status")
-                    ->get();
-            }
-            $decWtArry = array();
-            foreach($submissions as $key=>$value)
-            {
-                if(in_array($value->next_grade, $garray))
-                {
-                    if($value->first_choice != "" && $value->second_choice != "")
-                    {
-
-                        $tmp = $this->convertToArray($value);
-                        $choice = getApplicationProgramName($value->first_choice);
-                        $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                        $tmp['first_choice'] = $value->first_choice;
-                        $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                        $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                        $tmp['second_choice'] = $value->second_choice;
-                        $tmp['second_program'] = "";
-                        $tmp['rank'] = $this->priorityCalculate($value, "first");
-                         if($value->first_offer_status != "Declined & Waitlisted")
-                        {
-                            $firstdata[] = $tmp;
-                        }
-
-                        $tmp['rank'] = $this->priorityCalculate($value, "second");
-                        $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                        $tmp['first_program'] = "";
-                        if($value->second_offer_status != "Declined & Waitlisted")
-                        {
-                            $seconddata[] = $tmp;
-                        }
+                    $firstdata[] = $tmp;
+                } else {
+                    $tmp = $this->convertToArray($value);
+                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                    $tmp['first_program'] = "";
+                    $tmp['score'] = $score;
+                    $tmp['first_choice'] = $value->first_choice;
+                    $tmp['second_choice'] = $value->second_choice;
+                    $tmp['cdi'] = $cdiArr;
+                    $tmp['rank'] = $this->priorityCalculate($value, "second");
+                    if ($this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
                     }
-                    elseif($value->first_choice != "")
-                    {
-                        $tmp = $this->convertToArray($value);
-                        $choice = getApplicationProgramName($value->first_choice);
-                        $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                        $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                        $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                        $tmp['second_program'] = "";
-                        $tmp['rank'] = $this->priorityCalculate($value, "first");
-                        if($value->first_offer_status != "Declined & Waitlisted")
-                        {
-                            $firstdata[] = $tmp;
-                        }
-         
-                    }
-                    else
-                    {
-                        $tmp = $this->convertToArray($value);
-                        $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                        $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                        $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                        $tmp['first_program'] = "";
-                        $tmp['first_choice'] = $value->first_choice;
-                        $tmp['second_choice'] = $value->second_choice;
-                        $tmp['rank'] = $this->priorityCalculate($value, "second");
-                        if($value->second_offer_status != "Declined & Waitlisted")
-                        {
-                            $seconddata[] = $tmp;
-                        }
-                    }
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
+                    $seconddata[] = $tmp;
                 }
-            }
-
-            if(!empty($firstdata))
-            {
-                $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
-                foreach($firstdata as $key=>$value)
-                {
-                    $f_siblings['rank'][] = $value['rank']; 
-                    $f_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+            } else {
+                $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
+                if (!empty($cdi_data)) {
+                    $incomplete_reason = "Grade";
+                } else {
+                    $incomplete_reason = "Both";
                 }
-                array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC,$firstdata);
+                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value->id, "version" => $version], ["first_choice_final_status" => "Denied Due To Incomplete Records", "first_offered_rank" => 0, "first_waitlist_for" => $value['first_choice_program_id'], "second_choice_final_status" => "Denied Due To Incomplete Records", "second_offered_rank" => 0, "second_waitlist_for" => $value['second_choice_program_id'], 'incomplete_reason' => $incomplete_reason, "version" => $version]);
             }
+        }
 
-            if(!empty($seconddata))
-            {
-                foreach($seconddata as $key=>$value)
-                {
-                    $s_siblings['rank'][] = $value['rank'];
-                    $s_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
-                }
-                array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC,$seconddata);
+        if (!empty($firstdata)) {
+            $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
+            foreach ($firstdata as $key => $value) {
+                $f_siblings['rank'][] = $value['rank'];
+                $f_lottery_numbers['lottery_number'][] = $value['lottery_number'];
             }
+            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC, $firstdata);
+        }
+
+        if (!empty($seconddata)) {
+            foreach ($seconddata as $key => $value) {
+                $s_siblings['rank'][] = $value['rank'];
+                $s_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC, $seconddata);
+        }
 
 
-            $tmpAvailability = $availabilityArray;
-            $waitlistArr = $offeredRank = $firstOffered = array();
-            foreach($firstdata as $key=>$value)
-            {
-                if(isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']]))
-                {
+        //$tmpAvailability = $availabilityArray;
+        $waitlistArr = $offeredRank = $firstOffered = array();
+        foreach ($firstdata as $key => $value) {
+            if ($value['grade_status'] == "Pass" && $value['cdi_status'] == "Pass") {
+                if (isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']])) {
 
-                    if($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0 && in_array($value['first_choice_program_id'], $parray))
-                    {
+                    if ($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0) {
                         $firstdata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
                         $firstOffered[] = $value['id'];
-                        if(isset($offeredRank[$value['first_choice_program_id']]))
-                        {
+                        if (isset($offeredRank[$value['first_choice_program_id']])) {
                             $offeredRank[$value['first_choice_program_id']] = $offeredRank[$value['first_choice_program_id']] + 1;
-                        }
-                        else
-                        {
+                        } else {
                             $offeredRank[$value['first_choice_program_id']] = 1;
                         }
 
                         $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] - 1;
-                        do
-                        {
-                            $code = mt_rand(100000, 999999);
+                        do {
+                            $code = Str::random(10);
                             $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
-                        }
-                        while(!empty($user_code));      
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Offered", "first_offered_rank"=> $offeredRank[$value['first_choice_program_id']], "first_waitlist_for"=>$value['first_choice_program_id'], 'offer_slug'=>$code, "version"=>$version]);
-                    }
-                    else
-                    {
+                        } while (!empty($user_code));
+                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Offered", "first_offered_rank" => $offeredRank[$value['first_choice_program_id']], "first_waitlist_for" => $value['first_choice_program_id'], 'offer_slug' => $code, "version" => $version]);
+                    } else {
                         $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                        if(isset($waitlistArr[$value['first_choice_program_id']]))
-                        {
+                        if (isset($waitlistArr[$value['first_choice_program_id']])) {
                             $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
-                        }
-                        else
-                        {
+                        } else {
                             $waitlistArr[$value['first_choice_program_id']] = 1;
                         }
 
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']], "version"=>$version]);
-
-
-                    }    
-                }
-                else
-                {
-                    $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                    if(isset($waitlistArr[$value['first_choice_program_id']]))
-                    {
-                        $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']], "version" => $version]);
                     }
-                    else
-                    {
+                } else {
+                    $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                    if (isset($waitlistArr[$value['first_choice_program_id']])) {
+                        $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                    } else {
                         $waitlistArr[$value['first_choice_program_id']] = 1;
                     }
-                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']], "version"=>$version]);
-
+                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']], "version" => $version]);
                 }
+            } else {
+                $firstdata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Eligibility</div>";
+                if ($value['cdi_status'] == "Fail" && $value['grade_status'] == "Fail") {
+                    $first_choice_eligibility_reason = "Both";
+                } elseif ($value['cdi_status'] == "Fail") {
+                    $first_choice_eligibility_reason = "CDI";
+                } else {
+                    $first_choice_eligibility_reason = "Grade";
+                }
+
+                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Denied due to Ineligibility", "first_waitlist_for" => $value['first_choice_program_id'], "first_choice_eligibility_reason" => $first_choice_eligibility_reason, "version" => $version]);
             }
-
-            foreach($seconddata as $key=>$value)
-            {
-                
-                    if(isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']]))
-                    {
-                        if($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered)  && in_array($value['second_choice_program_id'], $parray) )
-                        {
-                            $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                            $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
-
-                            if(isset($offeredRank[$value['second_choice_program_id']]))
-                            {
-                                $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
-                            }
-                            else
-                            {
-                                $offeredRank[$value['second_choice_program_id']] = 1;
-                            }
-                            do
-                            {
-                                $code = mt_rand(100000, 999999);
-                                $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
-                            }
-                            while(!empty($user_code));    
-
-                            $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Offered", "second_offered_rank"=> $offeredRank[$value['second_choice_program_id']], "second_waitlist_for"=>$value['second_choice_program_id'], 'offer_slug'=>$code, "version"=>$version]);
-
-
-                        }
-                        else
-                        {
-                            $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                            if(isset($waitlistArr[$value['second_choice_program_id']]))
-                            {
-                                $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                            }
-                            else
-                            {
-                                $waitlistArr[$value['second_choice_program_id']] = 1;
-                            }
-
-                            $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']], "version"=>$version]);
-
-                        }    
-                    }
-                    else
-                    {
-                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                        if(isset($waitlistArr[$value['second_choice_program_id']]))
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = 1;
-                        }
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']], "version"=>$version]);
-
-                    }
-            }
-
-
-            /* Code for Late Submissions */
-            $firstdata = $seconddata = array();
-            
-            $subjects = $terms = array();
-            $eligibilityArr = array();
-
-            $firstData = Submissions::distinct()->where("late_submission", "Y")->where(function ($q) use ($parray){
-                                    $q->whereIn("first_choice_program_id", $parray)->orWhereIn("second_choice_program_id", $parray);
-                                })->whereIn("next_grade", $garray)->get(["first_choice", "second_choice"]);
-            //print_r($parray);
-//            $secondData = Submissions::distinct()->where("late_submission", "Y")->whereIn("second_choice_program_id", $parray)->whereIn("next_grade", $garray)->get(["first_choice"]);
-
-            foreach($firstData as $value)
-            {
-
-
-                if($value->first_choice != "")
-                {
-                    //echo "FC".$value->first_choice."<BR>";
-                    $eligibilityData = getEligibilitiesLateSubmission($value->first_choice, 'Academic Grade Calculation');
-
-                    if(count($eligibilityData) > 0)
-                    {
-                        if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                        {
-                            $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                           // echo $eligibilityData[0]->id;exit;
-                            $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
-
-                      //      print_r($content);
-                       //     echo "<BR><BR><BR>---------------------------------------------------------<BR><BR><BR>";
-                            if(!empty($content))
-                            {
-                                if($content->scoring->type=="DD" || $content->scoring->type=="CLSG" || $content->scoring->type=="GA")
-                                {
-                                    $tmp = array();
-                                    
-                                    foreach($content->subjects as $svalue)
-                                    {
-                                        if(!in_array($svalue, $subjects))
-                                        {
-                                            $subjects[] = $svalue;
-                                        }
-                                    }
-
-                                    $str = "";
-                                    foreach($content->terms_calc as $svalue)
-                                    {
-                                        $str .= $svalue."-";
-                                    }
-                                    $str = trim($str, "-");
-
-                                    if(!in_array($str, $terms))
-                                    {
-                                        $terms[] = $str;
-                                    }
-
-                                    
-                                }
-                            }                        
-                        }
-
-                    }
-                }
-
-                if($value->second_choice != "")
-                {
-                    //echo "FC".$value->first_choice."<BR>";
-                    $eligibilityData = getEligibilitiesLateSubmission($value->second_choice, 'Academic Grade Calculation');
-
-                    if(count($eligibilityData) > 0)
-                    {
-                        if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                        {
-                            $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                           // echo $eligibilityData[0]->id;exit;
-                            $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
-
-                      //      print_r($content);
-                       //     echo "<BR><BR><BR>---------------------------------------------------------<BR><BR><BR>";
-                            if(!empty($content))
-                            {
-                                if($content->scoring->type=="DD" || $content->scoring->type=="CLSG" || $content->scoring->type=="GA")
-                                {
-                                    $tmp = array();
-                                    
-                                    foreach($content->subjects as $svalue)
-                                    {
-                                        if(!in_array($svalue, $subjects))
-                                        {
-                                            $subjects[] = $svalue;
-                                        }
-                                    }
-
-                                    $str = "";
-                                    foreach($content->terms_calc as $svalue)
-                                    {
-                                        $str .= $svalue."-";
-                                    }
-                                    $str = trim($str, "-");
-
-                                    if(!in_array($str, $terms))
-                                    {
-                                        $terms[] = $str;
-                                    }
-
-                                    
-                                }
-                            }                        
-                        }
-
-                    }
-                }
-
-            }
-
-    //exit;
-            //print_r($parray);exit;
-
-            /* Get Set Eligibility Data Set for first choice program and second choice program
-             */
-
-            $setEligibilityData = array();
-            foreach($firstData as $value)
-            {
-                if(!in_array($value->first_choice, array_keys($setEligibilityData)))
-                {
-                    $data = getSetEligibilityDataLS($value->first_choice, 3);
-                    foreach($subjects as $svalue)
-                    {
-                        $str = "";
-                        foreach($terms as $tvalue)
-                        {
-                            $str .= $tvalue."-";
-    /*                        else
-                                $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
-                        }
-                        $str = trim($str, "-");
-                        $str = str_replace(" Qtr Grade", "", $str);                        
-                        if(isset($data->{$svalue."-".$str}))
-                        {
-                            $setEligibilityData[$value->first_choice][$svalue."-".$str] = $data->{$svalue."-".$str}[0];
-                        }
-                    }
-                }
-
-                if(!in_array($value->second_choice, array_keys($setEligibilityData)))
-                {
-                    $data = getSetEligibilityDataLS($value->second_choice, 3);
-                    foreach($subjects as $svalue)
-                    {
-                        $str = "";
-                        foreach($terms as $tvalue)
-                        {
-                            $str .= $tvalue."-";
-    /*                        else
-                                $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
-                        }
-                        $str = trim($str, "-");
-                        $str = str_replace(" Qtr Grade", "", $str);
-                        if(isset($data->{$svalue."-".$str}))
-                        {
-                            $setEligibilityData[$value->second_choice][$svalue."-".$str] = $data->{$svalue."-".$str}[0];
-                        }
-                    }
-                }
-
-            }
-
-    //print_r($terms);exit;
-
-            /* Get CDI Set Eligibility Data Set for first choice program and second choice program
-             */
-
-                $setCDIEligibilityData = array();
-                foreach($firstData as $value)
-                {
-                    if(!in_array($value->first_choice, array_keys($setCDIEligibilityData)))
-                    {
-                        $data = getSetEligibilityData($value->first_choice, 8);
-                        if(!empty($data))
-                        {
-                            $setCDIEligibilityData[$value->first_choice]['b_info'] = $data->B[0];
-                            $setCDIEligibilityData[$value->first_choice]['c_info'] = $data->C[0];
-                            $setCDIEligibilityData[$value->first_choice]['d_info'] = $data->D[0];
-                            $setCDIEligibilityData[$value->first_choice]['e_info'] = $data->E[0];
-                            $setCDIEligibilityData[$value->first_choice]['susp'] = $data->Susp[0];
-                            $setCDIEligibilityData[$value->first_choice]['susp_days'] = $data->SuspDays[0];
-                        }
-                    }
-                if(!in_array($value->second_choice, array_keys($setCDIEligibilityData)))
-                {
-                    $data = getSetEligibilityData($value->second_choice, 8);
-                    if(!empty($data))
-                    {
-                        $setCDIEligibilityData[$value->second_choice]['b_info'] = $data->B[0];
-                        $setCDIEligibilityData[$value->second_choice]['c_info'] = $data->C[0];
-                        $setCDIEligibilityData[$value->second_choice]['d_info'] = $data->D[0];
-                        $setCDIEligibilityData[$value->second_choice]['e_info'] = $data->E[0];
-                        $setCDIEligibilityData[$value->second_choice]['susp'] = $data->Susp[0];
-                        $setCDIEligibilityData[$value->second_choice]['susp_days'] = $data->SuspDays[0];
-                    }
-                }
-            }
-            /* Get CDI Data */
-
-            $submissions=Submissions::
-                where('submissions.district_id', Session::get('district_id'))
-                ->where("late_submission", "Y")
-                ->where(function ($q) use ($parray){
-                                    $q->whereIn("first_choice_program_id", $parray)->orWhereIn("second_choice_program_id", $parray);
-                                })
-                ->whereIn("next_grade", $garray)
-                ->whereIn('submission_status', array('Active', 'Pending'))
-    //            ->limit(5)
-                ->get();
-
-            $firstdata = $seconddata = array();
-            $programGrades = array();
-            foreach($submissions as $key=>$value)
-            {
-                if(!isset($programGrades[$value->first_choice_program_id]))
-                {
-                    $availableGrades = array();
-                    $eligibilityData = getEligibilitiesByProgramLateSubmission($value->first_choice_program_id, 'Academic Grade Calculation');
-                    if(isset($eligibilityData[0]))
-                    {
-                        $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
-                        $programGrades[$value->first_choice_program_id] = $availableGrades;
-                    }
-                } 
-                $skip = false;
-                if($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id]))
-                {
-                    $skip = true;
-                }
-
-                if($value->second_choice_program_id != '' && $value->second_choice_program_id != '0')
-                {
-                    if(!isset($programGrades[$value->second_choice_program_id]))
-                    {
-                        $availableGrades = array();
-                        $eligibilityData = getEligibilitiesByProgramLateSubmission($value->second_choice_program_id, 'Academic Grade Calculation');
-                        if(isset($eligibilityData[0]))
-                        {
-                            $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
-                            $programGrades[$value->second_choice_program_id] = $availableGrades;
-                        }
-                    } 
-                    if(!in_array($value->next_grade, $programGrades[$value->second_choice_program_id]))
-                    {
-                        $skip = true;
-                    }
-                }
-                $score = $this->collectionStudentGradeReportLateSubmission($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData);
-
-                if(count($score) > 0)
-                {
-
-                    if($skip)
-                    {
-                        $cdiArr = array();
-                        $cdiArr['b_info'] = "NA";
-                        $cdiArr['c_info'] = "NA";
-                        $cdiArr['d_info'] = "NA";
-                        $cdiArr['e_info'] = "NA";
-                        $cdiArr['susp'] = "NA";
-                        $cdiArr['susp_days'] = "NA";
-                    }
-                    else
-                    {
-                        $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-                        if(!empty($cdi_data))
-                        {
-                            $cdiArr = array();
-                            $cdiArr['b_info'] = $cdi_data->b_info;
-                            $cdiArr['c_info'] = $cdi_data->c_info;
-                            $cdiArr['d_info'] = $cdi_data->d_info;
-                            $cdiArr['e_info'] = $cdi_data->e_info;
-                            $cdiArr['susp'] = $cdi_data->susp;
-                            $cdiArr['susp_days'] = $cdi_data->susp_days;
-                        }
-                        elseif($value->cdi_override == "Y")
-                        {
-                            $cdiArr = array();
-                            $cdiArr['b_info'] = 0;
-                            $cdiArr['c_info'] = 0;
-                            $cdiArr['d_info'] = 0;
-                            $cdiArr['e_info'] = 0;
-                            $cdiArr['susp'] = 0;
-                            $cdiArr['susp_days'] = 0;
-                        }
-                        else
-                        {
-                            $incomplete_reason = "CDI";
-                            $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value->id, "version"=>$version], ["first_choice_final_status"=>"Denied Due To Incomplete Records", "first_offered_rank"=> 0, "first_waitlist_for"=>$value['first_choice_program_id'], "second_choice_final_status"=>"Denied Due To Incomplete Records", "second_offered_rank"=>0, "second_waitlist_for"=>$value['second_choice_program_id'], 'incomplete_reason'=>$incomplete_reason, "version"=>$version]);
-                            continue;
-                        }
-                    }
-                    if($value->first_choice != "" && $value->second_choice != "")
-                    {
-
-                        $tmp = $this->convertToArray($value);
-                        $choice = getApplicationProgramName($value->first_choice);
-                        $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                        $tmp['first_choice'] = $value->first_choice;
-                        $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                        $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                        $tmp['second_choice'] = $value->second_choice;
-                        $tmp['second_program'] = "";
-                        $tmp['score'] = $score;
-                        $tmp['cdi'] = $cdiArr;
-                        if($value->cdi_override == "Y")
-                            $tmp['cdi_status'] = "Pass";
-                        else
-                        {
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                        }
-                        $tmp['rank'] = $this->priorityCalculate($value, "first");
-                        if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                        $firstdata[] = $tmp;
-
-                        if($this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                        $tmp['rank'] = $this->priorityCalculate($value, "second");
-                        if($value->cdi_override == "Y")
-                            $tmp['cdi_status'] = "Pass";
-                        else
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                        $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                        $tmp['first_program'] = "";
-                        $tmp['score'] = $score;
-                        $tmp['cdi'] = $cdiArr;
-                        $seconddata[] = $tmp;
-
-                    }
-                    elseif($value->first_choice != "")
-                    {
-                        $tmp = $this->convertToArray($value);
-                        $choice = getApplicationProgramName($value->first_choice);
-                        $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                        $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                        $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                        $tmp['second_program'] = "";
-                        $tmp['score'] = $score;
-                        $tmp['first_choice'] = $value->first_choice;
-                        $tmp['second_choice'] = $value->second_choice;
-                        $tmp['cdi'] = $cdiArr;
-                        $tmp['rank'] = $this->priorityCalculate($value, "first");
-                        if($value->cdi_override == "Y")
-                            $tmp['cdi_status'] = "Pass";
-                        else
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                        if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                        $firstdata[] = $tmp;
-                    }
-                    else
-                    {
-                        $tmp = $this->convertToArray($value);
-                        $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                        $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                        $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                        $tmp['first_program'] = "";
-                        $tmp['score'] = $score;
-                        $tmp['first_choice'] = $value->first_choice;
-                        $tmp['second_choice'] = $value->second_choice;
-                        $tmp['cdi'] = $cdiArr;
-                        $tmp['rank'] = $this->priorityCalculate($value, "second");
-                        if($this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                        $seconddata[] = $tmp;
-                    }
-                }
-                else
-                {
-                    $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-                    if(!empty($cdi_data))
-                    {
-                        $incomplete_reason = "Grade";
-                    }
-                    else
-                    {
-                        $incomplete_reason = "Both";
-                    }
-                            $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value->id, "version"=>$version], ["first_choice_final_status"=>"Denied Due To Incomplete Records", "first_offered_rank"=> 0, "first_waitlist_for"=>$value['first_choice_program_id'], "second_choice_final_status"=>"Denied Due To Incomplete Records", "second_offered_rank"=>0, "second_waitlist_for"=>$value['second_choice_program_id'], 'incomplete_reason'=>$incomplete_reason, "version"=>$version]);
-                }
-            }
-
-           if(!empty($firstdata))
-           {
-                $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
-                foreach($firstdata as $key=>$value)
-                {
-                    $f_siblings['rank'][] = $value['rank']; 
-                    $f_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
-                }
-                array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC,$firstdata);
-            }
-
-            if(!empty($seconddata))
-            {
-                foreach($seconddata as $key=>$value)
-                {
-                    $s_siblings['rank'][] = $value['rank'];
-                    $s_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
-                }
-                array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC,$seconddata);
-            }
-           
-
-            //$tmpAvailability = $availabilityArray;
-            $waitlistArr = $offeredRank = $firstOffered = array();
-            foreach($firstdata as $key=>$value)
-            {
-                if($value['grade_status'] == "Pass" && $value['cdi_status'] == "Pass")
-                {
-                    if(isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']]))
-                    {
-
-                        if($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0)
-                        {
-                            $firstdata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                            $firstOffered[] = $value['id'];
-                            if(isset($offeredRank[$value['first_choice_program_id']]))
-                            {
-                                $offeredRank[$value['first_choice_program_id']] = $offeredRank[$value['first_choice_program_id']] + 1;
-                            }
-                            else
-                            {
-                                $offeredRank[$value['first_choice_program_id']] = 1;
-                            }
-
-                            $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] - 1;
-                            do
-                            {
-                                $code = Str::random(10);
-                                $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
-                            }
-                            while(!empty($user_code));      
-                            $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Offered", "first_offered_rank"=> $offeredRank[$value['first_choice_program_id']], "first_waitlist_for"=>$value['first_choice_program_id'], 'offer_slug'=>$code, "version"=>$version]);
-                        }
-                        else
-                        {
-                            $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                            if(isset($waitlistArr[$value['first_choice_program_id']]))
-                            {
-                                $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
-                            }
-                            else
-                            {
-                                $waitlistArr[$value['first_choice_program_id']] = 1;
-                            }
-
-                            $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']], "version"=>$version]);
-
-
-                        }    
-                    }
-                    else
-                    {
-                        $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                        if(isset($waitlistArr[$value['first_choice_program_id']]))
-                        {
-                            $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $waitlistArr[$value['first_choice_program_id']] = 1;
-                        }
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']], "version"=>$version]);
-
-                    }
-                }
-                else
-                {
-                    $firstdata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Eligibility</div>";
-                    if($value['cdi_status'] == "Fail" && $value['grade_status'] == "Fail")
-                    {
-                        $first_choice_eligibility_reason = "Both";
-                    }
-                    elseif($value['cdi_status'] == "Fail")
-                    {
-                        $first_choice_eligibility_reason = "CDI";
-                    }
-                    else
-                    {
-                        $first_choice_eligibility_reason = "Grade";
-                    }
-
-                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Denied due to Ineligibility", "first_waitlist_for"=>$value['first_choice_program_id'], "first_choice_eligibility_reason"=>$first_choice_eligibility_reason, "version"=>$version]);
-                }
-            }
-
-            foreach($seconddata as $key=>$value)
-            {
-                if($value['grade_status'] == "Pass" && $value['cdi_status'] == "Pass")
-                {
-                    if(isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']]))
-                    {
-                        if($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered))
-                        {
-                            $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                            $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
-
-                            if(isset($offeredRank[$value['second_choice_program_id']]))
-                            {
-                                $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
-                            }
-                            else
-                            {
-                                $offeredRank[$value['second_choice_program_id']] = 1;
-                            }
-                            do
-                            {
-                                $code = Str::random(10);
-                                $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
-                            }
-                            while(!empty($user_code));    
-
-                            $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Offered", "second_offered_rank"=> $offeredRank[$value['second_choice_program_id']], "second_waitlist_for"=>$value['second_choice_program_id'], 'offer_slug'=>$code, "version"=>$version]);
-
-
-                        }
-                        else
-                        {
-                            $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                            if(isset($waitlistArr[$value['second_choice_program_id']]))
-                            {
-                                $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                            }
-                            else
-                            {
-                                $waitlistArr[$value['second_choice_program_id']] = 1;
-                            }
-
-                            $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']], "version"=>$version]);
-
-                        }    
-                    }
-                    else
-                    {
-                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                        if(isset($waitlistArr[$value['second_choice_program_id']]))
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = 1;
-                        }
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']], "version"=>$version]);
-
-                    }
-                }
-                else
-                {
-                    $seconddata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Ineligibility</div>";
-                    if($value['cdi_status'] == "Fail" && $value['grade_status'] == "Fail")
-                    {
-                        $second_choice_eligibility_reason = "Both";
-                    }
-                    elseif($value['cdi_status'] == "Fail")
-                    {
-                        $second_choice_eligibility_reason = "CDI";
-                    }
-                    else
-                    {
-                        $second_choice_eligibility_reason = "Grade";
-                    }
-
-                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Denied due to Ineligibility", "second_waitlist_for"=>$value['second_choice_program_id'], "second_choice_eligibility_reason"=>$second_choice_eligibility_reason, "version"=>$version]);
-
-                }
-            }
-            echo "Done";
-
-
         }
+
+        foreach ($seconddata as $key => $value) {
+            if ($value['grade_status'] == "Pass" && $value['cdi_status'] == "Pass") {
+                if (isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']])) {
+                    if ($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered)) {
+                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
+                        $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
+
+                        if (isset($offeredRank[$value['second_choice_program_id']])) {
+                            $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
+                        } else {
+                            $offeredRank[$value['second_choice_program_id']] = 1;
+                        }
+                        do {
+                            $code = Str::random(10);
+                            $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
+                        } while (!empty($user_code));
+
+                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Offered", "second_offered_rank" => $offeredRank[$value['second_choice_program_id']], "second_waitlist_for" => $value['second_choice_program_id'], 'offer_slug' => $code, "version" => $version]);
+                    } else {
+                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                        if (isset($waitlistArr[$value['second_choice_program_id']])) {
+                            $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
+                        } else {
+                            $waitlistArr[$value['second_choice_program_id']] = 1;
+                        }
+
+                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']], "version" => $version]);
+                    }
+                } else {
+                    $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                    if (isset($waitlistArr[$value['second_choice_program_id']])) {
+                        $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
+                    } else {
+                        $waitlistArr[$value['second_choice_program_id']] = 1;
+                    }
+                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']], "version" => $version]);
+                }
+            } else {
+                $seconddata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Ineligibility</div>";
+                if ($value['cdi_status'] == "Fail" && $value['grade_status'] == "Fail") {
+                    $second_choice_eligibility_reason = "Both";
+                } elseif ($value['cdi_status'] == "Fail") {
+                    $second_choice_eligibility_reason = "CDI";
+                } else {
+                    $second_choice_eligibility_reason = "Grade";
+                }
+
+                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Denied due to Ineligibility", "second_waitlist_for" => $value['second_choice_program_id'], "second_choice_eligibility_reason" => $second_choice_eligibility_reason, "version" => $version]);
+            }
+        }
+        echo "Done";
+    }
     /* Late Submissions Individual Submissions Ends */
     public function generateWaitlistIndividualStatus()
     {
@@ -2933,91 +2289,74 @@ exit;*/
         $availabilityArray = array();
         $parray = $garray = array();
         $allProgram = Availability::distinct()->where("district_id", Session::get("district_id"))->get(['program_id']);
-        foreach($allProgram as $key=>$value)
-        {
+        foreach ($allProgram as $key => $value) {
             $avail_grade = Availability::where("district_id", Session::get("district_id"))->where("program_id", $value->program_id)->get();
-            foreach($avail_grade as $gkey=>$gvalue)
-            {
-                $offer_count = Submissions::where('district_id', Session::get("district_id"))->where(function ($q) use ($value, $gvalue){
-                                $q->where(function ($q1)  use ($value, $gvalue){
-                                    $q1->where('first_choice_final_status', 'Offered')->where('first_offer_status', 'Accepted')->where('first_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
-                                })->orWhere(function ($q1) use ($value, $gvalue){
-                                    $q1->where('second_choice_final_status', 'Offered')->where('second_offer_status', 'Accepted')->where('second_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
-                                });
-                            })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->count();
+            foreach ($avail_grade as $gkey => $gvalue) {
+                $offer_count = Submissions::where('district_id', Session::get("district_id"))->where(function ($q) use ($value, $gvalue) {
+                    $q->where(function ($q1)  use ($value, $gvalue) {
+                        $q1->where('first_choice_final_status', 'Offered')->where('first_offer_status', 'Accepted')->where('first_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
+                    })->orWhere(function ($q1) use ($value, $gvalue) {
+                        $q1->where('second_choice_final_status', 'Offered')->where('second_offer_status', 'Accepted')->where('second_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
+                    });
+                })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->count();
 
 
                 $rs = WaitlistAvailability::where("program_id", $value->program_id)->where("grade", $gvalue->grade)->first();
-                if(!empty($rs))
-                {
+                if (!empty($rs)) {
                     $garray[] = $gvalue->grade;
                     $parray[] = $value->program_id;
                     $availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats + $rs->withdrawn_seats - $offer_count;
-                }
-                else
-                {
+                } else {
                     $availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats - $offer_count;
                 }
             }
         }
 
         SubmissionsWaitlistFinalStatus::where("version", $version)->delete();
-        $submissions=Submissions::
-            where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue){
-                                $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
-                            })->where(function ($q) use ($parray){
-                                $q->whereIn("first_choice_program_id", $parray)->orWhereIn("second_choice_program_id", $parray);
-                            })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_final_status.first_offer_status", "submissions_final_status.second_offer_status")
+        $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))->where(function ($q) use ($value, $gvalue) {
+            $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
+        })->where(function ($q) use ($parray) {
+            $q->whereIn("first_choice_program_id", $parray)->orWhereIn("second_choice_program_id", $parray);
+        })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_final_status.first_offer_status", "submissions_final_status.second_offer_status")
             ->get();
         $decWtArry = array();
 
-        
-        foreach($submissions as $key=>$value)
-        {
-            if(in_array($value->next_grade, $garray))
-            {
-                if($value->first_choice != "" && $value->second_choice != "")
-                {
+
+        foreach ($submissions as $key => $value) {
+            if (in_array($value->next_grade, $garray)) {
+                if ($value->first_choice != "" && $value->second_choice != "") {
 
                     $tmp = $this->convertToArray($value);
                     $choice = getApplicationProgramName($value->first_choice);
-                    $tmp['first_program'] =getApplicationProgramName($value->first_choice);
+                    $tmp['first_program'] = getApplicationProgramName($value->first_choice);
                     $tmp['first_choice'] = $value->first_choice;
                     $tmp['first_choice_program_id'] = $value->first_choice_program_id;
                     $tmp['second_choice_program_id'] = $value->second_choice_program_id;
                     $tmp['second_choice'] = $value->second_choice;
                     $tmp['second_program'] = "";
                     $tmp['rank'] = $this->priorityCalculate($value, "first");
-                     if($value->first_offer_status != "Declined & Waitlisted")
-                    {
+                    if ($value->first_offer_status != "Declined & Waitlisted") {
                         $firstdata[] = $tmp;
                     }
 
                     $tmp['rank'] = $this->priorityCalculate($value, "second");
                     $tmp['second_program'] = getApplicationProgramName($value->second_choice);
                     $tmp['first_program'] = "";
-                    if($value->second_offer_status != "Declined & Waitlisted")
-                    {
+                    if ($value->second_offer_status != "Declined & Waitlisted") {
                         $seconddata[] = $tmp;
                     }
-                }
-                elseif($value->first_choice != "")
-                {
+                } elseif ($value->first_choice != "") {
                     $tmp = $this->convertToArray($value);
                     $choice = getApplicationProgramName($value->first_choice);
-                    $tmp['first_program'] =getApplicationProgramName($value->first_choice);
+                    $tmp['first_program'] = getApplicationProgramName($value->first_choice);
                     $tmp['first_choice_program_id'] = $value->first_choice_program_id;
                     $tmp['second_choice_program_id'] = $value->second_choice_program_id;
                     $tmp['second_program'] = "";
                     $tmp['rank'] = $this->priorityCalculate($value, "first");
-                    if($value->first_offer_status != "Declined & Waitlisted")
-                    {
+                    if ($value->first_offer_status != "Declined & Waitlisted") {
                         $firstdata[] = $tmp;
                     }
-     
-                }
-                else
-                {
+                } else {
                     $tmp = $this->convertToArray($value);
                     $tmp['second_program'] = getApplicationProgramName($value->second_choice);
                     $tmp['first_choice_program_id'] = $value->first_choice_program_id;
@@ -3026,8 +2365,7 @@ exit;*/
                     $tmp['first_choice'] = $value->first_choice;
                     $tmp['second_choice'] = $value->second_choice;
                     $tmp['rank'] = $this->priorityCalculate($value, "second");
-                    if($value->second_offer_status != "Declined & Waitlisted")
-                    {
+                    if ($value->second_offer_status != "Declined & Waitlisted") {
                         $seconddata[] = $tmp;
                     }
                 }
@@ -3035,250 +2373,182 @@ exit;*/
         }
 
 
-        if(!empty($firstdata))
-        {
+        if (!empty($firstdata)) {
             $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
-            foreach($firstdata as $key=>$value)
-            {
-                $f_siblings['rank'][] = $value['rank']; 
-                $f_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+            foreach ($firstdata as $key => $value) {
+                $f_siblings['rank'][] = $value['rank'];
+                $f_lottery_numbers['lottery_number'][] = $value['lottery_number'];
             }
-            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC,$firstdata);
+            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC, $firstdata);
         }
 
-        if(!empty($seconddata))
-        {
-            foreach($seconddata as $key=>$value)
-            {
+        if (!empty($seconddata)) {
+            foreach ($seconddata as $key => $value) {
                 $s_siblings['rank'][] = $value['rank'];
-                $s_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+                $s_lottery_numbers['lottery_number'][] = $value['lottery_number'];
             }
-            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC,$seconddata);
+            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC, $seconddata);
         }
 
         $tmpAvailability = $availabilityArray;
         $waitlistArr = $offeredRank = $firstOffered = array();
-        foreach($firstdata as $key=>$value)
-        {
-            if(isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']]))
-            {
+        foreach ($firstdata as $key => $value) {
+            if (isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']])) {
 
-                if($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0 && in_array($value['first_choice_program_id'], $parray))
-                {
+                if ($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0 && in_array($value['first_choice_program_id'], $parray)) {
                     $firstdata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
                     $firstOffered[] = $value['id'];
-                    if(isset($offeredRank[$value['first_choice_program_id']]))
-                    {
+                    if (isset($offeredRank[$value['first_choice_program_id']])) {
                         $offeredRank[$value['first_choice_program_id']] = $offeredRank[$value['first_choice_program_id']] + 1;
-                    }
-                    else
-                    {
+                    } else {
                         $offeredRank[$value['first_choice_program_id']] = 1;
                     }
 
                     $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] - 1;
-                    do
-                    {
+                    do {
                         $code = mt_rand(100000, 999999);
                         $user_code = SubmissionsWaitlistFinalStatus::where('offer_slug', $code)->first();
-                    }
-                    while(!empty($user_code));      
-                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Offered", "first_offered_rank"=> $offeredRank[$value['first_choice_program_id']], "first_waitlist_for"=>$value['first_choice_program_id'], 'offer_slug'=>$code, "version"=>$version]);
-                }
-                else
-                {
+                    } while (!empty($user_code));
+                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Offered", "first_offered_rank" => $offeredRank[$value['first_choice_program_id']], "first_waitlist_for" => $value['first_choice_program_id'], 'offer_slug' => $code, "version" => $version]);
+                } else {
                     $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                    if(isset($waitlistArr[$value['first_choice_program_id']]))
-                    {
+                    if (isset($waitlistArr[$value['first_choice_program_id']])) {
                         $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
-                    }
-                    else
-                    {
+                    } else {
                         $waitlistArr[$value['first_choice_program_id']] = 1;
                     }
 
-                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']], "version"=>$version]);
-
-
-                }    
-            }
-            else
-            {
-                $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                if(isset($waitlistArr[$value['first_choice_program_id']]))
-                {
-                    $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']], "version" => $version]);
                 }
-                else
-                {
+            } else {
+                $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                if (isset($waitlistArr[$value['first_choice_program_id']])) {
+                    $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                } else {
                     $waitlistArr[$value['first_choice_program_id']] = 1;
                 }
-                $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']], "version"=>$version]);
-
+                $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']], "version" => $version]);
             }
         }
 
-        foreach($seconddata as $key=>$value)
-        {
-            
-                if(isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']]))
-                {
-                    if($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered)  && in_array($value['second_choice_program_id'], $parray) )
-                    {
-                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                        $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
+        foreach ($seconddata as $key => $value) {
 
-                        if(isset($offeredRank[$value['second_choice_program_id']]))
-                        {
-                            $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $offeredRank[$value['second_choice_program_id']] = 1;
-                        }
-                        do
-                        {
-                            $code = mt_rand(100000, 999999);
-                            $user_code = SubmissionsWaitlistFinalStatus::where('offer_slug', $code)->first();
-                        }
-                        while(!empty($user_code));    
+            if (isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']])) {
+                if ($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered)  && in_array($value['second_choice_program_id'], $parray)) {
+                    $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
+                    $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
 
-                        $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Offered", "second_offered_rank"=> $offeredRank[$value['second_choice_program_id']], "second_waitlist_for"=>$value['second_choice_program_id'], 'offer_slug'=>$code, "version"=>$version]);
-
-
+                    if (isset($offeredRank[$value['second_choice_program_id']])) {
+                        $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
+                    } else {
+                        $offeredRank[$value['second_choice_program_id']] = 1;
                     }
-                    else
-                    {
-                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                        if(isset($waitlistArr[$value['second_choice_program_id']]))
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = 1;
-                        }
+                    do {
+                        $code = mt_rand(100000, 999999);
+                        $user_code = SubmissionsWaitlistFinalStatus::where('offer_slug', $code)->first();
+                    } while (!empty($user_code));
 
-                        $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']], "version"=>$version]);
-
-                    }    
-                }
-                else
-                {
+                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Offered", "second_offered_rank" => $offeredRank[$value['second_choice_program_id']], "second_waitlist_for" => $value['second_choice_program_id'], 'offer_slug' => $code, "version" => $version]);
+                } else {
                     $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                    if(isset($waitlistArr[$value['second_choice_program_id']]))
-                    {
+                    if (isset($waitlistArr[$value['second_choice_program_id']])) {
                         $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                    }
-                    else
-                    {
+                    } else {
                         $waitlistArr[$value['second_choice_program_id']] = 1;
                     }
-                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']], "version"=>$version]);
 
+                    $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']], "version" => $version]);
                 }
+            } else {
+                $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                if (isset($waitlistArr[$value['second_choice_program_id']])) {
+                    $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
+                } else {
+                    $waitlistArr[$value['second_choice_program_id']] = 1;
+                }
+                $rs = SubmissionsWaitlistFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']], "version" => $version]);
+            }
         }
         echo "Done";
-
-
     }
 
     /* Code for Late Submissions Process Selection */
     public function late_submission_wailist_calculate()
     {
         $rsWt = WaitlistProcessLogs::count();
-        if($rsWt > 0)
-        {
+        if ($rsWt > 0) {
             $id = WaitlistProcessLogs::orderBy("created_at", "DESC")->first()->version;
-        }
-        else
-        {
+        } else {
             $id = 0;
         }
         $firstdata = $seconddata = array();
-         if($id == 0)
-         {
+        if ($id == 0) {
 
-            $submissions=Submissions::
-                where('submissions.district_id', Session::get('district_id'))->where('late_submission', "N")->where(function ($q) {
-                                    $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
-                                })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_final_status.first_offer_status", "submissions_final_status.second_offer_status")
+            $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))->where('late_submission', "N")->where(function ($q) {
+                $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
+            })->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_final_status.first_offer_status", "submissions_final_status.second_offer_status")
                 ->get();
-         }
-         else
-         {
-            $submissions=Submissions::
-                where('submissions.district_id', Session::get('district_id'))->where('late_submission', "N")->where(function ($q) {
-                                    $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
-                                })->join("submissions_waitlist_final_status", "submissions_waitlist_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_waitlist_final_status.first_offer_status", "submissions_waitlist_final_status.second_offer_status")
+        } else {
+            $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))->where('late_submission', "N")->where(function ($q) {
+                $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
+            })->join("submissions_waitlist_final_status", "submissions_waitlist_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_waitlist_final_status.first_offer_status", "submissions_waitlist_final_status.second_offer_status")
                 ->get();
-         }
+        }
 
-            $decWtArry = array();
-            foreach($submissions as $key=>$value)
-            {
-                if($value->first_choice != "" && $value->second_choice != "")
-                {
+        $decWtArry = array();
+        foreach ($submissions as $key => $value) {
+            if ($value->first_choice != "" && $value->second_choice != "") {
 
-                    $tmp = $this->convertToArray($value);
-                    $choice = getApplicationProgramName($value->first_choice);
-                    $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                    $tmp['first_choice'] = $value->first_choice;
-                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                    $tmp['second_choice'] = $value->second_choice;
-                    $tmp['second_program'] = "";
-                    $tmp['org_rank'] = 1;
-                    $tmp['rank'] = $this->priorityCalculate($value, "first");
-                     if($value->first_offer_status != "Declined & Waitlisted")
-                    {
-                        $firstdata[] = $tmp;
-                    }
-                    $tmp['org_rank'] = 1;
-                    $tmp['rank'] = $this->priorityCalculate($value, "second");
-                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                    $tmp['first_program'] = "";
-                    if($value->second_offer_status != "Declined & Waitlisted")
-                    {
-                        $seconddata[] = $tmp;
-                    }
+                $tmp = $this->convertToArray($value);
+                $choice = getApplicationProgramName($value->first_choice);
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['second_program'] = "";
+                $tmp['org_rank'] = 1;
+                $tmp['rank'] = $this->priorityCalculate($value, "first");
+                if ($value->first_offer_status != "Declined & Waitlisted") {
+                    $firstdata[] = $tmp;
                 }
-                elseif($value->first_choice != "")
-                {
-                    $tmp = $this->convertToArray($value);
-                    $choice = getApplicationProgramName($value->first_choice);
-                    $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                    $tmp['second_program'] = "";
-                    $tmp['org_rank'] = 1;
-                    $tmp['rank'] = $this->priorityCalculate($value, "first");
-                    if($value->first_offer_status != "Declined & Waitlisted")
-                    {
-                        $firstdata[] = $tmp;
-                    }
-     
+                $tmp['org_rank'] = 1;
+                $tmp['rank'] = $this->priorityCalculate($value, "second");
+                $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                $tmp['first_program'] = "";
+                if ($value->second_offer_status != "Declined & Waitlisted") {
+                    $seconddata[] = $tmp;
                 }
-                else
-                {
-                    $tmp = $this->convertToArray($value);
-                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                    $tmp['first_program'] = "";
-                    $tmp['first_choice'] = $value->first_choice;
-                    $tmp['second_choice'] = $value->second_choice;
-                    $tmp['org_rank'] = 1;
-                    $tmp['rank'] = $this->priorityCalculate($value, "second");
-                    if($value->second_offer_status != "Declined & Waitlisted")
-                    {
-                        $seconddata[] = $tmp;
-                    }
+            } elseif ($value->first_choice != "") {
+                $tmp = $this->convertToArray($value);
+                $choice = getApplicationProgramName($value->first_choice);
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['second_program'] = "";
+                $tmp['org_rank'] = 1;
+                $tmp['rank'] = $this->priorityCalculate($value, "first");
+                if ($value->first_offer_status != "Declined & Waitlisted") {
+                    $firstdata[] = $tmp;
+                }
+            } else {
+                $tmp = $this->convertToArray($value);
+                $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['first_program'] = "";
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['org_rank'] = 1;
+                $tmp['rank'] = $this->priorityCalculate($value, "second");
+                if ($value->second_offer_status != "Declined & Waitlisted") {
+                    $seconddata[] = $tmp;
                 }
             }
+        }
 
 
-            /*$submissions=Submissions::
+        /*$submissions=Submissions::
                 where('submissions.district_id', Session::get('district_id'))->where('late_submission', "N")->where(function ($q) {
                                     $q->where("submission_status", "Waitlisted")->orWhere("submission_status", "Declined / Waitlist for other");
                                 })->join("submissions_waitlist_final_status", "submissions_waitlist_final_status.submission_id", "submissions.id")->select("submissions.*", "submissions_waitlist_final_status.first_offer_status", "submissions_waitlist_final_status.second_offer_status")
@@ -3346,7 +2616,7 @@ exit;*/
                     }
                 }
             }    */
-        return array("firstdata"=>$firstdata, "seconddata"=>$seconddata);
+        return array("firstdata" => $firstdata, "seconddata" => $seconddata);
     }
 
     public function generateLateSubmissionStatus()
@@ -3355,22 +2625,17 @@ exit;*/
         $version = $rs + 1;
 
         $rsWt = WaitlistProcessLogs::count();
-        if($rsWt > 0)
-        {
+        if ($rsWt > 0) {
             $id = WaitlistProcessLogs::orderBy("created_at", "DESC")->first()->version;
-        }
-        else
-        {
+        } else {
             $id = 0;
         }
 
         $availabilityArray = array();
         $allProgram = Availability::distinct()->where("district_id", Session::get("district_id"))->get(['program_id']);
-        foreach($allProgram as $key=>$value)
-        {
+        foreach ($allProgram as $key => $value) {
             $avail_grade = Availability::where("district_id", Session::get("district_id"))->where("program_id", $value->program_id)->get();
-            foreach($avail_grade as $gkey=>$gvalue)
-            {
+            foreach ($avail_grade as $gkey => $gvalue) {
                 /*$offer_count = Submissions::where('district_id', Session::get("district_id"))->where(function ($q) use ($value, $gvalue){
                                 $q->where(function ($q1)  use ($value, $gvalue){
                                     $q1->where('first_choice_final_status', 'Offered')->where('first_offer_status', 'Accepted')->where('first_choice_program_id', $value->program_id)->where('next_grade', $gvalue->grade);
@@ -3382,273 +2647,197 @@ exit;*/
                 $offer_count = app('App\Modules\Waitlist\Controllers\WaitlistController')->get_offer_count($value->program_id, $gvalue->grade, Session::get("district_id"), 1);
                 //echo $value->grade
                 $rs = WaitlistAvailabilityLog::where("program_id", $value->program_id)->where("grade", $gvalue->grade)->first();
-                if(!empty($rs))
-                {
+                if (!empty($rs)) {
                     $wt_count = $rs->withdrawn_seats;
-                }
-                else
-                {
+                } else {
                     $wt_count = 0;
                 }
-///---
+                ///---
                 $rs = LateSubmissionAvailability::where("program_id", $value->program_id)->where("grade", $gvalue->grade)->first();
-                if(!empty($rs))
-                {
+                if (!empty($rs)) {
                     $lt_count = $rs->withdrawn_seats;
-                }
-                else
-                {
+                } else {
                     $lt_count = 0;
                 }
                 $availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats + $wt_count + $lt_count - $offer_count;
-
             }
         }
         $tstArray = $this->late_submission_wailist_calculate();
         $firstdata = $tstArray['firstdata'];
         $seconddata = $tstArray['seconddata'];
 
-        if(!empty($firstdata))
-        {
+        if (!empty($firstdata)) {
             $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
-            foreach($firstdata as $key=>$value)
-            {
-                $f_siblings['rank'][] = $value['rank']; 
-                $f_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+            foreach ($firstdata as $key => $value) {
+                $f_siblings['rank'][] = $value['rank'];
+                $f_lottery_numbers['lottery_number'][] = $value['lottery_number'];
             }
-            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC,$firstdata);
+            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC, $firstdata);
         }
 
-        if(!empty($seconddata))
-        {
-            foreach($seconddata as $key=>$value)
-            {
+        if (!empty($seconddata)) {
+            foreach ($seconddata as $key => $value) {
                 $s_siblings['rank'][] = $value['rank'];
-                $s_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+                $s_lottery_numbers['lottery_number'][] = $value['lottery_number'];
             }
-            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC,$seconddata);
+            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC, $seconddata);
         }
 
         $tmpAvailability = $availabilityArray;
         //echo "<pre>";
         //print_r($tmpAvailability);exit;
         $waitlistArr = $offeredRank = $firstOffered = array();
-        foreach($firstdata as $key=>$value)
-        {
-            if(isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']]))
-            {
+        foreach ($firstdata as $key => $value) {
+            if (isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']])) {
 
-                if($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0)
-                {
+                if ($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0) {
                     $firstdata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
                     $firstOffered[] = $value['id'];
-                    if(isset($offeredRank[$value['first_choice_program_id']]))
-                    {
+                    if (isset($offeredRank[$value['first_choice_program_id']])) {
                         $offeredRank[$value['first_choice_program_id']] = $offeredRank[$value['first_choice_program_id']] + 1;
-                    }
-                    else
-                    {
+                    } else {
                         $offeredRank[$value['first_choice_program_id']] = 1;
                     }
 
                     $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] - 1;
-                    do
-                    {
+                    do {
                         $code = mt_rand(100000, 999999);
                         $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
-                    }
-                    while(!empty($user_code));      
-                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Offered", "first_offered_rank"=> $offeredRank[$value['first_choice_program_id']], "first_waitlist_for"=>$value['first_choice_program_id'], 'offer_slug'=>$code, "version"=>$version]);
+                    } while (!empty($user_code));
+                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Offered", "first_offered_rank" => $offeredRank[$value['first_choice_program_id']], "first_waitlist_for" => $value['first_choice_program_id'], 'offer_slug' => $code, "version" => $version]);
 
                     $pname = getProgramName($value['first_choice_program_id']);
-                    $rU = Submissions::where("id", $value['id'])->update(array("awarded_school"=>$pname));
-                }
-                else
-                {
+                    $rU = Submissions::where("id", $value['id'])->update(array("awarded_school" => $pname));
+                } else {
                     $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                    if(isset($waitlistArr[$value['first_choice_program_id']]))
-                    {
+                    if (isset($waitlistArr[$value['first_choice_program_id']])) {
                         $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
-                    }
-                    else
-                    {
+                    } else {
                         $waitlistArr[$value['first_choice_program_id']] = 1;
                     }
 
-                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']], "version"=>$version]);
-
-
-                }    
-            }
-            else
-            {
-                $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                if(isset($waitlistArr[$value['first_choice_program_id']]))
-                {
-                    $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']], "version" => $version]);
                 }
-                else
-                {
+            } else {
+                $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                if (isset($waitlistArr[$value['first_choice_program_id']])) {
+                    $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                } else {
                     $waitlistArr[$value['first_choice_program_id']] = 1;
                 }
-                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']], "version"=>$version]);
-
+                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']], "version" => $version]);
             }
         }
 
-        foreach($seconddata as $key=>$value)
-        {
-            
-                if(isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']]))
-                {
-                    if($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered))
-                    {
-                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                        $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
+        foreach ($seconddata as $key => $value) {
 
-                        if(isset($offeredRank[$value['second_choice_program_id']]))
-                        {
-                            $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $offeredRank[$value['second_choice_program_id']] = 1;
-                        }
-                        do
-                        {
-                            $code = mt_rand(100000, 999999);
-                            $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
-                        }
-                        while(!empty($user_code));    
+            if (isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']])) {
+                if ($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered)) {
+                    $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
+                    $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
 
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Offered", "second_offered_rank"=> $offeredRank[$value['second_choice_program_id']], "second_waitlist_for"=>$value['second_choice_program_id'], 'offer_slug'=>$code, "version"=>$version]);
+                    if (isset($offeredRank[$value['second_choice_program_id']])) {
+                        $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
+                    } else {
+                        $offeredRank[$value['second_choice_program_id']] = 1;
+                    }
+                    do {
+                        $code = mt_rand(100000, 999999);
+                        $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
+                    } while (!empty($user_code));
+
+                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Offered", "second_offered_rank" => $offeredRank[$value['second_choice_program_id']], "second_waitlist_for" => $value['second_choice_program_id'], 'offer_slug' => $code, "version" => $version]);
                     $pname = getProgramName($value['second_choice_program_id']);
-                    $rU = Submissions::where("id", $value['id'])->update(array("awarded_school"=>$pname));
-
-
-                    }
-                    else
-                    {
-                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                        if(isset($waitlistArr[$value['second_choice_program_id']]))
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = 1;
-                        }
-
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']], "version"=>$version]);
-
-                    }    
-                }
-                else
-                {
+                    $rU = Submissions::where("id", $value['id'])->update(array("awarded_school" => $pname));
+                } else {
                     $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                    if(isset($waitlistArr[$value['second_choice_program_id']]))
-                    {
+                    if (isset($waitlistArr[$value['second_choice_program_id']])) {
                         $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                    }
-                    else
-                    {
+                    } else {
                         $waitlistArr[$value['second_choice_program_id']] = 1;
                     }
-                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']], "version"=>$version]);
 
+                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']], "version" => $version]);
                 }
+            } else {
+                $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                if (isset($waitlistArr[$value['second_choice_program_id']])) {
+                    $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
+                } else {
+                    $waitlistArr[$value['second_choice_program_id']] = 1;
+                }
+                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']], "version" => $version]);
+            }
         }
         $firstdata = $seconddata = array();
-        
+
         $subjects = $terms = array();
         $eligibilityArr = array();
         $firstData = Submissions::distinct()->where("late_submission", "Y")->get(["first_choice"]);
-        foreach($firstData as $value)
-        {
-            if($value->first_choice != "")
-            {
+        foreach ($firstData as $value) {
+            if ($value->first_choice != "") {
                 //echo "FC".$value->first_choice."<BR>";
                 $eligibilityData = getEligibilitiesLateSubmission($value->first_choice, 'Academic Grade Calculation');
 
-                if(count($eligibilityData) > 0)
-                {
-                    if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                    {
+                if (count($eligibilityData) > 0) {
+                    if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
                         $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                       // echo $eligibilityData[0]->id;exit;
+                        // echo $eligibilityData[0]->id;exit;
                         $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
 
-                  //      print_r($content);
-                   //     echo "<BR><BR><BR>---------------------------------------------------------<BR><BR><BR>";
-                        if(!empty($content))
-                        {
-                            if($content->scoring->type=="DD" || $content->scoring->type=="CLSG")
-                            {
+                        //      print_r($content);
+                        //     echo "<BR><BR><BR>---------------------------------------------------------<BR><BR><BR>";
+                        if (!empty($content)) {
+                            if ($content->scoring->type == "DD" || $content->scoring->type == "CLSG") {
                                 $tmp = array();
-                                
-                                foreach($content->subjects as $svalue)
-                                {
-                                    if(!in_array($svalue, $subjects))
-                                    {
+
+                                foreach ($content->subjects as $svalue) {
+                                    if (!in_array($svalue, $subjects)) {
                                         $subjects[] = $svalue;
                                     }
                                 }
 
                                 $str = "";
-                                foreach($content->terms_calc as $svalue)
-                                {
-                                    $str .= $svalue."-";
+                                foreach ($content->terms_calc as $svalue) {
+                                    $str .= $svalue . "-";
                                 }
                                 $str = trim($str, "-");
 
-                                if(!in_array($str, $terms))
-                                {
+                                if (!in_array($str, $terms)) {
                                     $terms[] = $str;
                                 }
-
-                                
                             }
-                        }                        
+                        }
                     }
-
                 }
             }
         }
 
         $secondData = Submissions::distinct()->where("late_submission", "Y")->get(["second_choice"]);
-        foreach($secondData as $value)
-        {
-            if($value->second_choice != "")
-            {
+        foreach ($secondData as $value) {
+            if ($value->second_choice != "") {
                 $eligibilityData = getEligibilitiesLateSubmission($value->second_choice, 'Academic Grade Calculation');
-                if(count($eligibilityData) > 0)
-                {
+                if (count($eligibilityData) > 0) {
                     $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
-                                            //print_r($content);
-                        //echo "<BR><BR><BR>---------------------------------------------------------<BR><BR><BR>";
+                    //print_r($content);
+                    //echo "<BR><BR><BR>---------------------------------------------------------<BR><BR><BR>";
 
-                    if(!empty($content))
-                    {
-                        if($content->scoring->type=="DD" || $content->scoring->type=="CLSG")
-                        {
+                    if (!empty($content)) {
+                        if ($content->scoring->type == "DD" || $content->scoring->type == "CLSG") {
                             $tmp = array();
-                            
-                            foreach($content->subjects as $svalue)
-                            {
-                                if(!in_array($svalue, $subjects))
-                                {
+
+                            foreach ($content->subjects as $svalue) {
+                                if (!in_array($svalue, $subjects)) {
                                     $subjects[] = $value;
                                 }
                             }
 
                             $str = "";
-                            foreach($content->terms_calc as $svalue)
-                            {
-                                $str .= $svalue."-";
+                            foreach ($content->terms_calc as $svalue) {
+                                $str .= $svalue . "-";
                             }
                             $str = trim($str, "-");
-                            if(!in_array($str, $terms))
-                            {
+                            if (!in_array($str, $terms)) {
                                 $terms[] = $str;
                             }
                         }
@@ -3656,7 +2845,7 @@ exit;*/
                 }
             }
         }
-//exit;
+        //exit;
         //print_r($subjects);
         //print_r($terms);exit;
 
@@ -3665,1261 +2854,58 @@ exit;*/
 
         $setEligibilityData = array();
 
-        foreach($firstData as $value)
-        {
-            if(!in_array($value->first_choice, array_keys($setEligibilityData)))
-            {
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setEligibilityData))) {
 
                 $data = getSetEligibilityDataLS($value->first_choice, 3);
-                foreach($subjects as $svalue)
-                {
+                foreach ($subjects as $svalue) {
                     $str = "";
-                    foreach($terms as $tvalue)
-                    {
-                        $str .= $tvalue."-";
-/*                        else
+                    foreach ($terms as $tvalue) {
+                        $str .= $tvalue . "-";
+                        /*                        else
                             $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
                     }
                     $str = trim($str, "-");
                     $str = str_replace(" Qtr Grade", "", $str);
-                       
-                    if(isset($data->{$svalue."-".$str}))
-                    {
-                        $setEligibilityData[$value->first_choice][$svalue."-".$str] = $data->{$svalue."-".$str}[0];
+
+                    if (isset($data->{$svalue . "-" . $str})) {
+                        $setEligibilityData[$value->first_choice][$svalue . "-" . $str] = $data->{$svalue . "-" . $str}[0];
                     }
                 }
             }
-
         }
 
-        foreach($secondData as $value)
-        {
-            if(!in_array($value->second_choice, array_keys($setEligibilityData)))
-            {
+        foreach ($secondData as $value) {
+            if (!in_array($value->second_choice, array_keys($setEligibilityData))) {
                 $data = getSetEligibilityDataLS($value->second_choice, 3);
 
-                foreach($subjects as $svalue)
-                {
+                foreach ($subjects as $svalue) {
                     $str = "";
-                    foreach($terms as $tvalue)
-                    {
-                        $str .= $tvalue."-";
-/*                        else
+                    foreach ($terms as $tvalue) {
+                        $str .= $tvalue . "-";
+                        /*                        else
                             $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
                     }
                     $str = trim($str, "-");
                     $str = str_replace(" Qtr Grade", "", $str);
-                       
-                    if(isset($data->{$svalue."-".$str}))
-                    {
-                        $setEligibilityData[$value->first_choice][$svalue."-".$str] = $data->{$svalue."-".$str}[0];
-                    }
-                }
-            }
 
-        }
-
-//print_r($terms);exit;
-
-        /* Get CDI Set Eligibility Data Set for first choice program and second choice program
-         */
-
-            $setCDIEligibilityData = array();
-            foreach($firstData as $value)
-            {
-                if(!in_array($value->first_choice, array_keys($setCDIEligibilityData)))
-                {
-                    $data = getSetEligibilityDataLS($value->first_choice, 8);
-                    if(!empty($data))
-                    {
-                        $setCDIEligibilityData[$value->first_choice]['b_info'] = $data->B[0];
-                        $setCDIEligibilityData[$value->first_choice]['c_info'] = $data->C[0];
-                        $setCDIEligibilityData[$value->first_choice]['d_info'] = $data->D[0];
-                        $setCDIEligibilityData[$value->first_choice]['e_info'] = $data->E[0];
-                        $setCDIEligibilityData[$value->first_choice]['susp'] = $data->Susp[0];
-                        $setCDIEligibilityData[$value->first_choice]['susp_days'] = $data->SuspDays[0];
-                    }
-                }
-            }
-        foreach($secondData as $value)
-        {
-            if(!in_array($value->second_choice, array_keys($setCDIEligibilityData)))
-            {
-                $data = getSetEligibilityDataLS($value->second_choice, 8);
-                if(!empty($data))
-                {
-                    $setCDIEligibilityData[$value->second_choice]['b_info'] = $data->B[0];
-                    $setCDIEligibilityData[$value->second_choice]['c_info'] = $data->C[0];
-                    $setCDIEligibilityData[$value->second_choice]['d_info'] = $data->D[0];
-                    $setCDIEligibilityData[$value->second_choice]['e_info'] = $data->E[0];
-                    $setCDIEligibilityData[$value->second_choice]['susp'] = $data->Susp[0];
-                    $setCDIEligibilityData[$value->second_choice]['susp_days'] = $data->SuspDays[0];
-                }
-            }
-        }
-        /* Get CDI Data */
-        $submissions=Submissions::
-            where('submissions.district_id', Session::get('district_id'))
-            ->where("late_submission", "Y")
-            ->whereIn('submission_status', array('Active', 'Pending'))
-//->where("id", 3067)
-//            ->limit(5)
-            ->get();
-
-
-        $firstdata = $seconddata = array();
-        $programGrades = array();
-        foreach($submissions as $key=>$value)
-        {
-            if(!isset($programGrades[$value->first_choice_program_id]))
-            {
-                $availableGrades = array();
-                $eligibilityData = getEligibilitiesByProgramLateSubmission($value->first_choice_program_id, 'Academic Grade Calculation');
-                if(isset($eligibilityData[0]))
-                {
-                    $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
-                    $programGrades[$value->first_choice_program_id] = $availableGrades;
-                }
-            } 
-            $skip = false;
-            if($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id]))
-            {
-                $skip = true;
-            }
-
-            if($value->second_choice_program_id != '' && $value->second_choice_program_id != '0')
-            {
-                if(!isset($programGrades[$value->second_choice_program_id]))
-                {
-                    $availableGrades = array();
-                    $eligibilityData = getEligibilitiesByProgramLateSubmission($value->second_choice_program_id, 'Academic Grade Calculation');
-                    if(isset($eligibilityData[0]))
-                    {
-                        $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
-                        $programGrades[$value->second_choice_program_id] = $availableGrades;
-                    }
-                } 
-                if(!in_array($value->next_grade, $programGrades[$value->second_choice_program_id]))
-                {
-                    $skip = true;
-                }
-            }
-
-            $score = $this->collectionStudentGradeReportLateSubmission($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData);
-
-            
-           // print_r($this->eligibility_grade_pass);exit;
-            if(count($score) > 0)
-            {
-
-                if($skip)
-                {
-                    $cdiArr = array();
-                    $cdiArr['b_info'] = "NA";
-                    $cdiArr['c_info'] = "NA";
-                    $cdiArr['d_info'] = "NA";
-                    $cdiArr['e_info'] = "NA";
-                    $cdiArr['susp'] = "NA";
-                    $cdiArr['susp_days'] = "NA";
-                }
-                else
-                {
-                    $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-                    if(!empty($cdi_data))
-                    {
-                        $cdiArr = array();
-                        $cdiArr['b_info'] = $cdi_data->b_info;
-                        $cdiArr['c_info'] = $cdi_data->c_info;
-                        $cdiArr['d_info'] = $cdi_data->d_info;
-                        $cdiArr['e_info'] = $cdi_data->e_info;
-                        $cdiArr['susp'] = $cdi_data->susp;
-                        $cdiArr['susp_days'] = $cdi_data->susp_days;
-                    }
-                    elseif($value->cdi_override == "Y")
-                    {
-                        $cdiArr = array();
-                        $cdiArr['b_info'] = 0;
-                        $cdiArr['c_info'] = 0;
-                        $cdiArr['d_info'] = 0;
-                        $cdiArr['e_info'] = 0;
-                        $cdiArr['susp'] = 0;
-                        $cdiArr['susp_days'] = 0;
-                    }
-                    else
-                    {
-                        $incomplete_reason = "CDI";
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value->id, "version"=>$version], ["first_choice_final_status"=>"Denied Due To Incomplete Records", "first_offered_rank"=> 0, "first_waitlist_for"=>$value['first_choice_program_id'], "second_choice_final_status"=>"Denied Due To Incomplete Records", "second_offered_rank"=>0, "second_waitlist_for"=>$value['second_choice_program_id'], 'incomplete_reason'=>$incomplete_reason, "version"=>$version]);
-                        continue;
-                    }
-                }
-                if($value->first_choice != "" && $value->second_choice != "")
-                {
-
-                    $tmp = $this->convertToArray($value);
-                    $choice = getApplicationProgramName($value->first_choice);
-                    $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                    $tmp['first_choice'] = $value->first_choice;
-                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                    $tmp['second_choice'] = $value->second_choice;
-                    $tmp['second_program'] = "";
-                    $tmp['score'] = $score;
-                    $tmp['cdi'] = $cdiArr;
-                    if($value->cdi_override == "Y")
-                        $tmp['cdi_status'] = "Pass";
-                    else
-                    {
-                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                    }
-                    $tmp['rank'] = $this->priorityCalculate($value, "first");
-                    if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                    {
-                        $tmp['grade_status'] = "Pass";
-                    }
-                    else
-                    {
-                        $tmp['grade_status'] = "Fail";
-                    }
-                    $firstdata[] = $tmp;
-
-                    if($this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                    {
-                        $tmp['grade_status'] = "Pass";
-                    }
-                    else
-                    {
-                        $tmp['grade_status'] = "Fail";
-                    }
-                    $tmp['rank'] = $this->priorityCalculate($value, "second");
-                    if($value->cdi_override == "Y")
-                        $tmp['cdi_status'] = "Pass";
-                    else
-                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                    $tmp['first_program'] = "";
-                    $tmp['score'] = $score;
-                    $tmp['cdi'] = $cdiArr;
-                    $seconddata[] = $tmp;
-
-                }
-                elseif($value->first_choice != "")
-                {
-                    $tmp = $this->convertToArray($value);
-                    $choice = getApplicationProgramName($value->first_choice);
-                    $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                    $tmp['second_program'] = "";
-                    $tmp['score'] = $score;
-                    $tmp['first_choice'] = $value->first_choice;
-                    $tmp['second_choice'] = $value->second_choice;
-                    $tmp['cdi'] = $cdiArr;
-                    $tmp['rank'] = $this->priorityCalculate($value, "first");
-                    if($value->cdi_override == "Y")
-                        $tmp['cdi_status'] = "Pass";
-                    else
-                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                    if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                    {
-                        $tmp['grade_status'] = "Pass";
-                    }
-                    else
-                    {
-                        $tmp['grade_status'] = "Fail";
-                    }
-                    $firstdata[] = $tmp;
-                }
-                else
-                {
-                    $tmp = $this->convertToArray($value);
-                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                    $tmp['first_program'] = "";
-                    $tmp['score'] = $score;
-                    $tmp['first_choice'] = $value->first_choice;
-                    $tmp['second_choice'] = $value->second_choice;
-                    $tmp['cdi'] = $cdiArr;
-                    $tmp['rank'] = $this->priorityCalculate($value, "second");
-                    if($this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                    {
-                        $tmp['grade_status'] = "Pass";
-                    }
-                    else
-                    {
-                        $tmp['grade_status'] = "Fail";
-                    }
-                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                    $seconddata[] = $tmp;
-                }
-            }
-            else
-            {
-                $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-                if(!empty($cdi_data))
-                {
-                    $incomplete_reason = "Grade";
-                }
-                else
-                {
-                    $incomplete_reason = "Both";
-                }
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value->id, "version"=>$version], ["first_choice_final_status"=>"Denied Due To Incomplete Records", "first_offered_rank"=> 0, "first_waitlist_for"=>$value['first_choice_program_id'], "second_choice_final_status"=>"Denied Due To Incomplete Records", "second_offered_rank"=>0, "second_waitlist_for"=>$value['second_choice_program_id'], 'incomplete_reason'=>$incomplete_reason, "version"=>$version]);
-            }
-        }
-       if(!empty($firstdata))
-       {
-            $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
-            foreach($firstdata as $key=>$value)
-            {
-                $f_siblings['rank'][] = $value['rank']; 
-                $f_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
-            }
-            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC,$firstdata);
-        }
-
-        if(!empty($seconddata))
-        {
-            foreach($seconddata as $key=>$value)
-            {
-                $s_siblings['rank'][] = $value['rank'];
-                $s_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
-            }
-            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC,$seconddata);
-        }
-        //$tmpAvailability = $availabilityArray;
-        $waitlistArr = $offeredRank = $firstOffered = array();
-        
-        foreach($firstdata as $key=>$value)
-        {
-            if($value['grade_status'] == "Pass" && $value['cdi_status'] == "Pass")
-            {
-                if(isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']]))
-                {
-
-                    if($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0)
-                    {
-                        $firstdata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                        $firstOffered[] = $value['id'];
-                        if(isset($offeredRank[$value['first_choice_program_id']]))
-                        {
-                            $offeredRank[$value['first_choice_program_id']] = $offeredRank[$value['first_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $offeredRank[$value['first_choice_program_id']] = 1;
-                        }
-
-                        $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] - 1;
-                        do
-                        {
-                            $code = mt_rand(100000, 999999);
-                            $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
-                        }
-                        while(!empty($user_code));      
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Offered", "first_offered_rank"=> $offeredRank[$value['first_choice_program_id']], "first_waitlist_for"=>$value['first_choice_program_id'], 'offer_slug'=>$code, "version"=>$version]);
-                        $pname = getProgramName($value['first_choice_program_id']);
-                        $rU = Submissions::where("id", $value['id'])->update(array("awarded_school"=>$pname));
-
-                    }
-                    else
-                    {
-                        $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                        if(isset($waitlistArr[$value['first_choice_program_id']]))
-                        {
-                            $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $waitlistArr[$value['first_choice_program_id']] = 1;
-                        }
-
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']], "version"=>$version]);
-
-
-                    }    
-                }
-                else
-                {
-                    $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                    if(isset($waitlistArr[$value['first_choice_program_id']]))
-                    {
-                        $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
-                    }
-                    else
-                    {
-                        $waitlistArr[$value['first_choice_program_id']] = 1;
-                    }
-                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']], "version"=>$version]);
-
-                }
-            }
-            else
-            {
-                $firstdata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Eligibility</div>";
-                if($value['cdi_status'] == "Fail" && $value['grade_status'] == "Fail")
-                {
-                    $first_choice_eligibility_reason = "Both";
-                }
-                elseif($value['cdi_status'] == "Fail")
-                {
-                    $first_choice_eligibility_reason = "CDI";
-                }
-                else
-                {
-                    $first_choice_eligibility_reason = "Grade";
-                }
-
-                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["first_choice_final_status"=>"Denied due to Ineligibility", "first_waitlist_for"=>$value['first_choice_program_id'], "first_choice_eligibility_reason"=>$first_choice_eligibility_reason, "version"=>$version, "second_choice_final_status"=>"Denied due to Ineligibility", "second_waitlist_for"=>$value['second_choice_program_id']]);
-            }
-        }
-
-        foreach($seconddata as $key=>$value)
-        {
-            if($value['grade_status'] == "Pass" && $value['cdi_status'] == "Pass")
-            {
-                if(isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']]))
-                {
-                    if($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered))
-                    {
-                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                        $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
-
-                        if(isset($offeredRank[$value['second_choice_program_id']]))
-                        {
-                            $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $offeredRank[$value['second_choice_program_id']] = 1;
-                        }
-                        do
-                        {
-                            $code = mt_rand(100000, 999999);
-                            $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
-                        }
-                        while(!empty($user_code));    
-
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Offered", "second_offered_rank"=> $offeredRank[$value['second_choice_program_id']], "second_waitlist_for"=>$value['second_choice_program_id'], 'offer_slug'=>$code, "version"=>$version]);
-                        $pname = getProgramName($value['second_choice_program_id']);
-                        $rU = Submissions::where("id", $value['id'])->update(array("awarded_school"=>$pname));
-
-
-                    }
-                    else
-                    {
-                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                        if(isset($waitlistArr[$value['second_choice_program_id']]))
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = 1;
-                        }
-
-                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']], "version"=>$version]);
-
-                    }    
-                }
-                else
-                {
-                    $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                    if(isset($waitlistArr[$value['second_choice_program_id']]))
-                    {
-                        $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                    }
-                    else
-                    {
-                        $waitlistArr[$value['second_choice_program_id']] = 1;
-                    }
-                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']], "version"=>$version]);
-
-                }
-            }
-            else
-            {
-                $seconddata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Ineligibility</div>";
-                if($value['cdi_status'] == "Fail" && $value['grade_status'] == "Fail")
-                {
-                    $second_choice_eligibility_reason = "Both";
-                }
-                elseif($value['cdi_status'] == "Fail")
-                {
-                    $second_choice_eligibility_reason = "CDI";
-                }
-                else
-                {
-                    $second_choice_eligibility_reason = "Grade";
-                }
-
-                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version"=>$version], ["second_choice_final_status"=>"Denied due to Ineligibility", "second_waitlist_for"=>$value['second_choice_program_id'], "second_choice_eligibility_reason"=>$second_choice_eligibility_reason, "version"=>$version, "first_choice_final_status"=>"Denied due to Ineligibility", "first_waitlist_for"=>$value['first_choice_program_id']]);
-
-            }
-        }
-
-
-
-    }
-
-    /* Code Ends for Late Submission Process Selection */
-    public function generateStatus()
-    {
-        $availabilityArray = array();
-        $allProgram = Availability::distinct()->where("district_id", Session::get("district_id"))->get(['program_id']);
-        foreach($allProgram as $key=>$value)
-        {
-            $avail_grade = Availability::where("district_id", Session::get("district_id"))->where("program_id", $value->program_id)->get();
-            foreach($avail_grade as $gkey=>$gvalue)
-            {
-                $availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats;
-            }
-        }
-
-
-        $firstData = Submissions::distinct()->where("late_submission", "N")->get(["first_choice"]);
-
-         /* Get Subject and Acardemic Term like Q1.1 Q1.2 etc set for Academic Grade Calculation 
-                For all unique First Choice and Second Choice
-         */
-        $subjects = $terms = array();
-        $eligibilityArr = array();
-        foreach($firstData as $value)
-        {
-            if($value->first_choice != "")
-            {
-                $eligibilityData = getEligibilities($value->first_choice, 'Academic Grade Calculation');
-                if(count($eligibilityData) > 0)
-                {
-                    if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                    {
-                        $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                       // echo $eligibilityData[0]->id;exit;
-                        $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
-
-                        if(!empty($content))
-                        {
-                            if($content->scoring->type=="DD")
-                            {
-                                $tmp = array();
-                                
-                                foreach($content->subjects as $value)
-                                {
-                                    if(!in_array($value, $subjects))
-                                    {
-                                        $subjects[] = $value;
-                                    }
-                                }
-
-                                foreach($content->terms_calc as $value)
-                                {
-                                    if(!in_array($value, $terms))
-                                    {
-                                        $terms[] = $value;
-                                    }
-                                }
-                            }
-                        }                        
-                    }
-
-                }
-            }
-        }
-
-        $secondData = Submissions::distinct()->where("late_submission", "N")->get(["second_choice"]);
-        foreach($secondData as $value)
-        {
-            if($value->second_choice != "")
-            {
-                $eligibilityData = getEligibilities($value->second_choice, 'Academic Grade Calculation');
-                if(count($eligibilityData) > 0)
-                {
-                    $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
-                    if(!empty($content))
-                    {
-                        if($content->scoring->type=="DD")
-                        {
-                            $tmp = array();
-                            
-                            foreach($content->subjects as $value)
-                            {
-                                if(!in_array($value, $subjects))
-                                {
-                                    $subjects[] = $value;
-                                }
-                            }
-
-                            foreach($content->terms_calc as $value)
-                            {
-                                if(!in_array($value, $terms))
-                                {
-                                    $terms[] = $value;
-                                }
-                            }
-                        }
+                    if (isset($data->{$svalue . "-" . $str})) {
+                        $setEligibilityData[$value->first_choice][$svalue . "-" . $str] = $data->{$svalue . "-" . $str}[0];
                     }
                 }
             }
         }
 
-        /* Get Set Eligibility Data Set for first choice program and second choice program
-         */
-
-        $setEligibilityData = array();
-        foreach($firstData as $value)
-        {
-            if(!in_array($value->first_choice, array_keys($setEligibilityData)))
-            {
-                $data = getSetEligibilityData($value->first_choice, 3);
-                foreach($subjects as $svalue)
-                {
-                    foreach($terms as $tvalue)
-                    {
-                        if(isset($data->{$svalue."-".$tvalue}))
-                        {
-                            $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = $data->{$svalue."-".$tvalue}[0];
-                        }
-/*                        else
-                            $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
-                    }
-                }
-            }
-
-        }
-        foreach($secondData as $value)
-        {
-            if(!in_array($value->second_choice, array_keys($setEligibilityData)))
-            {
-                $data = getSetEligibilityData($value->second_choice, 3);
-                foreach($subjects as $svalue)
-                {
-                    foreach($terms as $tvalue)
-                    {
-                        if(isset($data->{$svalue."-".$tvalue}))
-                        {
-                            $setEligibilityData[$value->second_choice][$svalue."-".$tvalue] = $data->{$svalue."-".$tvalue}[0];
-                        }
-                     /*   else
-                            $setEligibilityData[$value->second_choice][$svalue."-".$tvalue] = 50;*/
-                    }
-                }
-            }
-
-        }
-
-
-        /* Get CDI Set Eligibility Data Set for first choice program and second choice program
-         */
-
-            $setCDIEligibilityData = array();
-            foreach($firstData as $value)
-            {
-                if(!in_array($value->first_choice, array_keys($setCDIEligibilityData)))
-                {
-                    $data = getSetEligibilityData($value->first_choice, 8);
-                    if(!empty($data))
-                    {
-                        $setCDIEligibilityData[$value->first_choice]['b_info'] = $data->B[0];
-                        $setCDIEligibilityData[$value->first_choice]['c_info'] = $data->C[0];
-                        $setCDIEligibilityData[$value->first_choice]['d_info'] = $data->D[0];
-                        $setCDIEligibilityData[$value->first_choice]['e_info'] = $data->E[0];
-                        $setCDIEligibilityData[$value->first_choice]['susp'] = $data->Susp[0];
-                        $setCDIEligibilityData[$value->first_choice]['susp_days'] = $data->SuspDays[0];
-                    }
-                }
-            }
-        foreach($secondData as $value)
-        {
-            if(!in_array($value->second_choice, array_keys($setCDIEligibilityData)))
-            {
-                $data = getSetEligibilityData($value->second_choice, 8);
-                if(!empty($data))
-                {
-                    $setCDIEligibilityData[$value->second_choice]['b_info'] = $data->B[0];
-                    $setCDIEligibilityData[$value->second_choice]['c_info'] = $data->C[0];
-                    $setCDIEligibilityData[$value->second_choice]['d_info'] = $data->D[0];
-                    $setCDIEligibilityData[$value->second_choice]['e_info'] = $data->E[0];
-                    $setCDIEligibilityData[$value->second_choice]['susp'] = $data->Susp[0];
-                    $setCDIEligibilityData[$value->second_choice]['susp_days'] = $data->SuspDays[0];
-                }
-            }
-        }
-        /* Get CDI Data */
-        $submissions=Submissions::
-            where('submissions.district_id', Session::get('district_id'))
-            ->whereIn('submission_status', array("Active", "Pending"))
-            ->where("late_submission", "N")
-//            ->limit(5)
-            ->get();
-
-
-        $firstdata = $seconddata = array();
-        $programGrades = array();
-        foreach($submissions as $key=>$value)
-        {
-            if(!isset($programGrades[$value->first_choice_program_id]))
-            {
-                $availableGrades = array();
-                $eligibilityData = getEligibilitiesByProgram($value->first_choice_program_id, 'Academic Grade Calculation');
-                if(isset($eligibilityData[0]))
-                {
-                    $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
-                    $programGrades[$value->first_choice_program_id] = $availableGrades;
-                }
-            } 
-            $skip = false;
-            if($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id]))
-            {
-                $skip = true;
-            }
-
-            if($value->second_choice_program_id != '' && $value->second_choice_program_id != '0')
-            {
-                if(!isset($programGrades[$value->second_choice_program_id]))
-                {
-                    $availableGrades = array();
-                    $eligibilityData = getEligibilitiesByProgram($value->second_choice_program_id, 'Academic Grade Calculation');
-                    if(isset($eligibilityData[0]))
-                    {
-                        $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
-                        $programGrades[$value->second_choice_program_id] = $availableGrades;
-                    }
-                } 
-                if(!in_array($value->next_grade, $programGrades[$value->second_choice_program_id]))
-                {
-                    $skip = true;
-                }
-            }
-
-            $score = $this->collectionStudentGradeReport($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData);
-            if(count($score) > 0)
-            {
-
-                if($skip)
-                {
-                    $cdiArr = array();
-                    $cdiArr['b_info'] = "NA";
-                    $cdiArr['c_info'] = "NA";
-                    $cdiArr['d_info'] = "NA";
-                    $cdiArr['e_info'] = "NA";
-                    $cdiArr['susp'] = "NA";
-                    $cdiArr['susp_days'] = "NA";
-                }
-                else
-                {
-                    $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-                    if(!empty($cdi_data))
-                    {
-                        $cdiArr = array();
-                        $cdiArr['b_info'] = $cdi_data->b_info;
-                        $cdiArr['c_info'] = $cdi_data->c_info;
-                        $cdiArr['d_info'] = $cdi_data->d_info;
-                        $cdiArr['e_info'] = $cdi_data->e_info;
-                        $cdiArr['susp'] = $cdi_data->susp;
-                        $cdiArr['susp_days'] = $cdi_data->susp_days;
-                    }
-                    elseif($value->cdi_override == "Y")
-                    {
-                        $cdiArr = array();
-                        $cdiArr['b_info'] = 0;
-                        $cdiArr['c_info'] = 0;
-                        $cdiArr['d_info'] = 0;
-                        $cdiArr['e_info'] = 0;
-                        $cdiArr['susp'] = 0;
-                        $cdiArr['susp_days'] = 0;
-                    }
-                    else
-                    {
-                        $incomplete_reason = "CDI";
-                        $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value->id], ["first_choice_final_status"=>"Denied Due To Incomplete Records", "first_offered_rank"=> 0, "first_waitlist_for"=>$value['first_choice_program_id'], "second_choice_final_status"=>"Denied Due To Incomplete Records", "second_offered_rank"=>0, "second_waitlist_for"=>$value['second_choice_program_id'], 'incomplete_reason'=>$incomplete_reason]);
-                        continue;
-                    }
-                }
-                if($value->first_choice != "" && $value->second_choice != "")
-                {
-
-                    $tmp = $this->convertToArray($value);
-                    $choice = getApplicationProgramName($value->first_choice);
-                    $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                    $tmp['first_choice'] = $value->first_choice;
-                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                    $tmp['second_choice'] = $value->second_choice;
-                    $tmp['second_program'] = "";
-                    $tmp['score'] = $score;
-                    $tmp['cdi'] = $cdiArr;
-                    if($value->cdi_override == "Y")
-                        $tmp['cdi_status'] = "Pass";
-                    else
-                    {
-                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                    }
-                    $tmp['rank'] = $this->priorityCalculate($value, "first");
-                    if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                    {
-                        $tmp['grade_status'] = "Pass";
-                    }
-                    else
-                    {
-                        $tmp['grade_status'] = "Fail";
-                    }
-                    $firstdata[] = $tmp;
-
-                    if($this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                    {
-                        $tmp['grade_status'] = "Pass";
-                    }
-                    else
-                    {
-                        $tmp['grade_status'] = "Fail";
-                    }
-                    $tmp['rank'] = $this->priorityCalculate($value, "second");
-                    if($value->cdi_override == "Y")
-                        $tmp['cdi_status'] = "Pass";
-                    else
-                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                    $tmp['first_program'] = "";
-                    $tmp['score'] = $score;
-                    $tmp['cdi'] = $cdiArr;
-                    $seconddata[] = $tmp;
-
-                }
-                elseif($value->first_choice != "")
-                {
-                    $tmp = $this->convertToArray($value);
-                    $choice = getApplicationProgramName($value->first_choice);
-                    $tmp['first_program'] =getApplicationProgramName($value->first_choice);
-                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                    $tmp['second_program'] = "";
-                    $tmp['score'] = $score;
-                    $tmp['first_choice'] = $value->first_choice;
-                    $tmp['second_choice'] = $value->second_choice;
-                    $tmp['cdi'] = $cdiArr;
-                    $tmp['rank'] = $this->priorityCalculate($value, "first");
-                    if($value->cdi_override == "Y")
-                        $tmp['cdi_status'] = "Pass";
-                    else
-                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                    if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                    {
-                        $tmp['grade_status'] = "Pass";
-                    }
-                    else
-                    {
-                        $tmp['grade_status'] = "Fail";
-                    }
-                    $firstdata[] = $tmp;
-                }
-                else
-                {
-                    $tmp = $this->convertToArray($value);
-                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
-                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
-                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
-                    $tmp['first_program'] = "";
-                    $tmp['score'] = $score;
-                    $tmp['first_choice'] = $value->first_choice;
-                    $tmp['second_choice'] = $value->second_choice;
-                    $tmp['cdi'] = $cdiArr;
-                    $tmp['rank'] = $this->priorityCalculate($value, "second");
-                    if($this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                    {
-                        $tmp['grade_status'] = "Pass";
-                    }
-                    else
-                    {
-                        $tmp['grade_status'] = "Fail";
-                    }
-                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                    $seconddata[] = $tmp;
-                }
-            }
-            else
-            {
-                $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-                if(!empty($cdi_data))
-                {
-                    $incomplete_reason = "Grade";
-                }
-                else
-                {
-                    $incomplete_reason = "Both";
-                }
-                $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value->id], ["first_choice_final_status"=>"Denied Due To Incomplete Records", "first_offered_rank"=> 0, "first_waitlist_for"=>$value['first_choice_program_id'], "second_choice_final_status"=>"Denied Due To Incomplete Records", "second_offered_rank"=>0, "second_waitlist_for"=>$value['second_choice_program_id'], 'incomplete_reason'=>$incomplete_reason]);
-            }
-        }
-
-       if(!empty($firstdata))
-       {
-            $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
-            foreach($firstdata as $key=>$value)
-            {
-                $f_siblings['rank'][] = $value['rank']; 
-                $f_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
-            }
-            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC,$firstdata);
-        }
-
-        if(!empty($seconddata))
-        {
-            foreach($seconddata as $key=>$value)
-            {
-                $s_siblings['rank'][] = $value['rank'];
-                $s_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
-            }
-            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC,$seconddata);
-        }
-
-        $tmpAvailability = $availabilityArray;
-        $waitlistArr = $offeredRank = $firstOffered = array();
-        foreach($firstdata as $key=>$value)
-        {
-            if($value['grade_status'] == "Pass" && $value['cdi_status'] == "Pass")
-            {
-                if(isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']]))
-                {
-
-                    if($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0)
-                    {
-                        $firstdata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                        $firstOffered[] = $value['id'];
-                        if(isset($offeredRank[$value['first_choice_program_id']]))
-                        {
-                            $offeredRank[$value['first_choice_program_id']] = $offeredRank[$value['first_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $offeredRank[$value['first_choice_program_id']] = 1;
-                        }
-
-                        $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] - 1;
-                        do
-                        {
-                            $code = mt_rand(100000, 999999);
-                            $user_code = SubmissionsFinalStatus::where('offer_slug', $code)->first();
-                        }
-                        while(!empty($user_code));      
-                        $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["first_choice_final_status"=>"Offered", "first_offered_rank"=> $offeredRank[$value['first_choice_program_id']], "first_waitlist_for"=>$value['first_choice_program_id'], 'offer_slug'=>$code]);
-                        $pname = getProgramName($value['first_choice_program_id']);
-                        $rU = Submissions::where("id", $value['id'])->update(array("awarded_school"=>$pname));
-
-                    }
-                    else
-                    {
-                        $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                        if(isset($waitlistArr[$value['first_choice_program_id']]))
-                        {
-                            $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $waitlistArr[$value['first_choice_program_id']] = 1;
-                        }
-
-                        $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']]]);
-
-
-                    }    
-                }
-                else
-                {
-                    $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                    if(isset($waitlistArr[$value['first_choice_program_id']]))
-                    {
-                        $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
-                    }
-                    else
-                    {
-                        $waitlistArr[$value['first_choice_program_id']] = 1;
-                    }
-                    $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["first_choice_final_status"=>"Waitlisted", "first_waitlist_for"=>$value['first_choice_program_id'], "first_waitlist_number"=>$waitlistArr[$value['first_choice_program_id']]]);
-
-                }
-            }
-            else
-            {
-                $firstdata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Eligibility</div>";
-                if($value['cdi_status'] == "Fail" && $value['grade_status'] == "Fail")
-                {
-                    $first_choice_eligibility_reason = "Both";
-                }
-                elseif($value['cdi_status'] == "Fail")
-                {
-                    $first_choice_eligibility_reason = "CDI";
-                }
-                else
-                {
-                    $first_choice_eligibility_reason = "Grade";
-                }
-
-                $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["first_choice_final_status"=>"Denied due to Ineligibility", "first_waitlist_for"=>$value['first_choice_program_id'], "first_choice_eligibility_reason"=>$first_choice_eligibility_reason]);
-            }
-        }
-
-        foreach($seconddata as $key=>$value)
-        {
-            if($value['grade_status'] == "Pass" && $value['cdi_status'] == "Pass")
-            {
-                if(isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']]))
-                {
-                    if($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered))
-                    {
-                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                        $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
-
-                        if(isset($offeredRank[$value['second_choice_program_id']]))
-                        {
-                            $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $offeredRank[$value['second_choice_program_id']] = 1;
-                        }
-                        do
-                        {
-                            $code = mt_rand(100000, 999999);
-                            $user_code = SubmissionsFinalStatus::where('offer_slug', $code)->first();
-                        }
-                        while(!empty($user_code));    
-
-                        $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["second_choice_final_status"=>"Offered", "second_offered_rank"=> $offeredRank[$value['second_choice_program_id']], "second_waitlist_for"=>$value['second_choice_program_id'], 'offer_slug'=>$code]);
-                        $pname = getProgramName($value['second_choice_program_id']);
-                        $rU = Submissions::where("id", $value['id'])->update(array("awarded_school"=>$pname));
-
-
-                    }
-                    else
-                    {
-                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                        if(isset($waitlistArr[$value['second_choice_program_id']]))
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                        }
-                        else
-                        {
-                            $waitlistArr[$value['second_choice_program_id']] = 1;
-                        }
-
-                        $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']]]);
-
-                    }    
-                }
-                else
-                {
-                    $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                    if(isset($waitlistArr[$value['second_choice_program_id']]))
-                    {
-                        $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
-                    }
-                    else
-                    {
-                        $waitlistArr[$value['second_choice_program_id']] = 1;
-                    }
-                    $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["second_choice_final_status"=>"Waitlisted", "second_waitlist_for"=>$value['second_choice_program_id'], "second_waitlist_number"=>$waitlistArr[$value['second_choice_program_id']]]);
-
-                }
-            }
-            else
-            {
-                $seconddata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Ineligibility</div>";
-                if($value['cdi_status'] == "Fail" && $value['grade_status'] == "Fail")
-                {
-                    $second_choice_eligibility_reason = "Both";
-                }
-                elseif($value['cdi_status'] == "Fail")
-                {
-                    $second_choice_eligibility_reason = "CDI";
-                }
-                else
-                {
-                    $second_choice_eligibility_reason = "Grade";
-                }
-
-                $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["second_choice_final_status"=>"Denied due to Ineligibility", "second_waitlist_for"=>$value['second_choice_program_id'], "second_choice_eligibility_reason"=>$second_choice_eligibility_reason]);
-
-            }
-        }
-    }
-
-    public function index($grade=0)
-    {
-
-        $settings = DB::table("reports_hide_option")->first();
-        $availabilityArray = array();
-        $allProgram = Availability::distinct()->where("district_id", Session::get("district_id"))->get(['program_id']);
-        foreach($allProgram as $key=>$value)
-        {
-            $avail_grade = Availability::where("district_id", Session::get("district_id"))->where("program_id", $value->program_id)->get();
-            foreach($avail_grade as $gkey=>$gvalue)
-            {
-                $availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats;
-            }
-        }
-
-        /* Get Next Grade Unique for Tabbing */
-        $grade_data = Submissions::distinct()->where('next_grade', '<>', '')->orderBy('next_grade', 'DESC')->get(["next_grade"]);
-        $gradeArr = array("K","1","2","3","4","5","6","7","8","9","10","11","12");
-        $fgradeTab = [];
-        foreach($grade_data as $key=>$value)
-        {
-            $fgradeTab[] = $value->next_grade;
-        }
-        $gradeTab = [];
-        foreach($gradeArr as $key=>$value)
-        {
-            if(in_array($value, $fgradeTab))
-                $gradeTab[] = $value;
-        }
-
-        if($grade == 0)
-            $existGrade = $gradeTab[0];
-        else
-            $existGrade = $grade;
-
-        $firstData = Submissions::distinct()->get(["first_choice"]);
-
-         /* Get Subject and Acardemic Term like Q1.1 Q1.2 etc set for Academic Grade Calculation 
-                For all unique First Choice and Second Choice
-         */
-        $subjects = $terms = array();
-        $eligibilityArr = array();
-        foreach($firstData as $value)
-        {
-            if($value->first_choice != "")
-            {
-                $eligibilityData = getEligibilities($value->first_choice, 'Academic Grade Calculation');
-                if(count($eligibilityData) > 0)
-                {
-                    if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                    {
-                        $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                       // echo $eligibilityData[0]->id;exit;
-                        $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
-
-                        if(!empty($content))
-                        {
-                            if($content->scoring->type=="DD")
-                            {
-                                $tmp = array();
-                                
-                                foreach($content->subjects as $value)
-                                {
-                                    if(!in_array($value, $subjects))
-                                    {
-                                        $subjects[] = $value;
-                                    }
-                                }
-
-                                foreach($content->terms_calc as $value)
-                                {
-                                    if(!in_array($value, $terms))
-                                    {
-                                        $terms[] = $value;
-                                    }
-                                }
-                            }
-                        }                        
-                    }
-
-                }
-            }
-        }
-
-        $secondData = Submissions::distinct()->get(["second_choice"]);
-        foreach($secondData as $value)
-        {
-            if($value->second_choice != "")
-            {
-                $eligibilityData = getEligibilities($value->second_choice, 'Academic Grade Calculation');
-                if(count($eligibilityData) > 0)
-                {
-                    $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
-                    if(!empty($content))
-                    {
-                        if($content->scoring->type=="DD")
-                        {
-                            $tmp = array();
-                            
-                            foreach($content->subjects as $value)
-                            {
-                                if(!in_array($value, $subjects))
-                                {
-                                    $subjects[] = $value;
-                                }
-                            }
-
-                            foreach($content->terms_calc as $value)
-                            {
-                                if(!in_array($value, $terms))
-                                {
-                                    $terms[] = $value;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        /* Get Set Eligibility Data Set for first choice program and second choice program
-         */
-
-        $setEligibilityData = array();
-        foreach($firstData as $value)
-        {
-            if(!in_array($value->first_choice, array_keys($setEligibilityData)))
-            {
-                $data = getSetEligibilityData($value->first_choice, 3);
-                foreach($subjects as $svalue)
-                {
-                    foreach($terms as $tvalue)
-                    {
-                        if(isset($data->{$svalue."-".$tvalue}))
-                        {
-                            $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = $data->{$svalue."-".$tvalue}[0];
-                        }
-/*                        else
-                            $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
-                    }
-                }
-            }
-
-        }
-        foreach($secondData as $value)
-        {
-            if(!in_array($value->second_choice, array_keys($setEligibilityData)))
-            {
-                $data = getSetEligibilityData($value->second_choice, 3);
-                foreach($subjects as $svalue)
-                {
-                    foreach($terms as $tvalue)
-                    {
-                        if(isset($data->{$svalue."-".$tvalue}))
-                        {
-                            $setEligibilityData[$value->second_choice][$svalue."-".$tvalue] = $data->{$svalue."-".$tvalue}[0];
-                        }
-                     /*   else
-                            $setEligibilityData[$value->second_choice][$svalue."-".$tvalue] = 50;*/
-                    }
-                }
-            }
-
-        }
-
+        //print_r($terms);exit;
 
         /* Get CDI Set Eligibility Data Set for first choice program and second choice program
          */
 
         $setCDIEligibilityData = array();
-        foreach($firstData as $value)
-        {
-            if(!in_array($value->first_choice, array_keys($setCDIEligibilityData)))
-            {
-                $data = getSetEligibilityData($value->first_choice, 8);
-                if(!empty($data))
-                {
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setCDIEligibilityData))) {
+                $data = getSetEligibilityDataLS($value->first_choice, 8);
+                if (!empty($data)) {
                     $setCDIEligibilityData[$value->first_choice]['b_info'] = $data->B[0];
                     $setCDIEligibilityData[$value->first_choice]['c_info'] = $data->C[0];
                     $setCDIEligibilityData[$value->first_choice]['d_info'] = $data->D[0];
@@ -4929,13 +2915,10 @@ exit;*/
                 }
             }
         }
-        foreach($secondData as $value)
-        {
-            if(!in_array($value->second_choice, array_keys($setCDIEligibilityData)))
-            {
-                $data = getSetEligibilityData($value->second_choice, 8);
-                if(!empty($data))
-                {
+        foreach ($secondData as $value) {
+            if (!in_array($value->second_choice, array_keys($setCDIEligibilityData))) {
+                $data = getSetEligibilityDataLS($value->second_choice, 8);
+                if (!empty($data)) {
                     $setCDIEligibilityData[$value->second_choice]['b_info'] = $data->B[0];
                     $setCDIEligibilityData[$value->second_choice]['c_info'] = $data->C[0];
                     $setCDIEligibilityData[$value->second_choice]['d_info'] = $data->D[0];
@@ -4946,69 +2929,51 @@ exit;*/
             }
         }
         /* Get CDI Data */
-        $submissions=Submissions::
-            where('submissions.district_id', Session::get('district_id'))
-            ->where('next_grade',$existGrade)
-            ->where('submission_status', array("Active", "Pending"))
-//            ->limit(5)
+        $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))
+            ->where("late_submission", "Y")
+            ->whereIn('submission_status', array('Active', 'Pending'))
+            //->where("id", 3067)
+            //            ->limit(5)
             ->get();
 
 
         $firstdata = $seconddata = array();
         $programGrades = array();
-        foreach($submissions as $key=>$value)
-        {
-            $failed = false;
-            if(!isset($programGrades[$value->first_choice_program_id]))
-            {
+        foreach ($submissions as $key => $value) {
+            if (!isset($programGrades[$value->first_choice_program_id])) {
                 $availableGrades = array();
-                $eligibilityData = getEligibilitiesByProgram($value->first_choice_program_id, 'Academic Grade Calculation');
-                if(isset($eligibilityData[0]))
-                {
-                    $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
+                $eligibilityData = getEligibilitiesByProgramLateSubmission($value->first_choice_program_id, 'Academic Grade Calculation');
+                if (isset($eligibilityData[0])) {
+                    $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
                     $programGrades[$value->first_choice_program_id] = $availableGrades;
                 }
-            } 
+            }
             $skip = false;
-            if($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id]))
-            {
+            if ($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id])) {
                 $skip = true;
             }
 
-            if($value->second_choice_program_id != '' && $value->second_choice_program_id != '0')
-            {
-                if(!isset($programGrades[$value->second_choice_program_id]))
-                {
+            if ($value->second_choice_program_id != '' && $value->second_choice_program_id != '0') {
+                if (!isset($programGrades[$value->second_choice_program_id])) {
                     $availableGrades = array();
-                    $eligibilityData = getEligibilitiesByProgram($value->second_choice_program_id, 'Academic Grade Calculation');
-                    if(isset($eligibilityData[0]))
-                    {
-                        $availableGrades = explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by);
+                    $eligibilityData = getEligibilitiesByProgramLateSubmission($value->second_choice_program_id, 'Academic Grade Calculation');
+                    if (isset($eligibilityData[0])) {
+                        $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
                         $programGrades[$value->second_choice_program_id] = $availableGrades;
                     }
-                } 
-                if(!in_array($value->next_grade, $programGrades[$value->second_choice_program_id]))
-                {
+                }
+                if (!in_array($value->next_grade, $programGrades[$value->second_choice_program_id])) {
                     $skip = true;
                 }
             }
 
-            $score = $this->collectionStudentGradeReport($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData);
-            if(count($score) <= 0)
-            {
-                $failed = true;
-                $score = array();
-                foreach($subjects as $svalue)
-                {
-                    foreach($terms as $svalue1)
-                    {
-                        $score[$svalue][$svalue1] = "";
-                    }
-                }
-            }
+            $score = $this->collectionStudentGradeReportLateSubmission($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData);
 
-                if($skip)
-                {
+
+            // print_r($this->eligibility_grade_pass);exit;
+            if (count($score) > 0) {
+
+                if ($skip) {
                     $cdiArr = array();
                     $cdiArr['b_info'] = "NA";
                     $cdiArr['c_info'] = "NA";
@@ -5016,12 +2981,9 @@ exit;*/
                     $cdiArr['e_info'] = "NA";
                     $cdiArr['susp'] = "NA";
                     $cdiArr['susp_days'] = "NA";
-                }
-                else
-                {
+                } else {
                     $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-                    if(!empty($cdi_data))
-                    {
+                    if (!empty($cdi_data)) {
                         $cdiArr = array();
                         $cdiArr['b_info'] = $cdi_data->b_info;
                         $cdiArr['c_info'] = $cdi_data->c_info;
@@ -5029,9 +2991,7 @@ exit;*/
                         $cdiArr['e_info'] = $cdi_data->e_info;
                         $cdiArr['susp'] = $cdi_data->susp;
                         $cdiArr['susp_days'] = $cdi_data->susp_days;
-                    }
-                    elseif($value->cdi_override == "Y")
-                    {
+                    } elseif ($value->cdi_override == "Y") {
                         $cdiArr = array();
                         $cdiArr['b_info'] = 0;
                         $cdiArr['c_info'] = 0;
@@ -5039,26 +2999,17 @@ exit;*/
                         $cdiArr['e_info'] = 0;
                         $cdiArr['susp'] = 0;
                         $cdiArr['susp_days'] = 0;
-                    }
-                    else
-                    {
-                        $failed = true;
-                        $cdiArr = array();
-                        $cdiArr['b_info'] = "";
-                        $cdiArr['c_info'] = "";
-                        $cdiArr['d_info'] = "";
-                        $cdiArr['e_info'] = "";
-                        $cdiArr['susp'] = "";
-                        $cdiArr['susp_days'] = "";
+                    } else {
+                        $incomplete_reason = "CDI";
+                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value->id, "version" => $version], ["first_choice_final_status" => "Denied Due To Incomplete Records", "first_offered_rank" => 0, "first_waitlist_for" => $value['first_choice_program_id'], "second_choice_final_status" => "Denied Due To Incomplete Records", "second_offered_rank" => 0, "second_waitlist_for" => $value['second_choice_program_id'], 'incomplete_reason' => $incomplete_reason, "version" => $version]);
+                        continue;
                     }
                 }
-                if($value->first_choice != "" && $value->second_choice != "")
-                {
-
+                if ($value->first_choice != "" && $value->second_choice != "") {
 
                     $tmp = $this->convertToArray($value);
                     $choice = getApplicationProgramName($value->first_choice);
-                    $tmp['first_program'] =getApplicationProgramName($value->first_choice);
+                    $tmp['first_program'] = getApplicationProgramName($value->first_choice);
                     $tmp['first_choice'] = $value->first_choice;
                     $tmp['first_choice_program_id'] = $value->first_choice_program_id;
                     $tmp['second_choice_program_id'] = $value->second_choice_program_id;
@@ -5066,73 +3017,38 @@ exit;*/
                     $tmp['second_program'] = "";
                     $tmp['score'] = $score;
                     $tmp['cdi'] = $cdiArr;
-                    if($value->cdi_override == "Y")
+                    if ($value->cdi_override == "Y")
                         $tmp['cdi_status'] = "Pass";
-                    else
-                    {
+                    else {
                         $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
                     }
                     $tmp['rank'] = $this->priorityCalculate($value, "first");
-                    $tmp['magnet_employee'] = $value->mcp_employee;
-                    $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-                    if(!isset($this->eligibility_grade_pass[$value->id]['first']))
-                    {
-                        $tmp['grade_status'] = "NA";
-                    }
-                    else
-                    {
-                        if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
+                    if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
                     }
                     $firstdata[] = $tmp;
 
-                    if(!isset($this->eligibility_grade_pass[$value->id]['second']))
-                    {
-                        $tmp['grade_status'] = "NA";
-                    }
-                    else
-                    {
-                        if($this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
+                    if ($this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
                     }
                     $tmp['rank'] = $this->priorityCalculate($value, "second");
-
-                    if($value->cdi_override == "Y")
+                    if ($value->cdi_override == "Y")
                         $tmp['cdi_status'] = "Pass";
                     else
-                    {
-                        if($failed == true)
-                        {
-                            $tmp['cdi_status'] = "NA";
-                        }
-                        else
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-                    }
-
+                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
                     $tmp['second_program'] = getApplicationProgramName($value->second_choice);
                     $tmp['first_program'] = "";
                     $tmp['score'] = $score;
                     $tmp['cdi'] = $cdiArr;
                     $seconddata[] = $tmp;
-
-                }
-                elseif($value->first_choice != "")
-                {
+                } elseif ($value->first_choice != "") {
                     $tmp = $this->convertToArray($value);
                     $choice = getApplicationProgramName($value->first_choice);
-                    $tmp['first_program'] =getApplicationProgramName($value->first_choice);
+                    $tmp['first_program'] = getApplicationProgramName($value->first_choice);
                     $tmp['first_choice_program_id'] = $value->first_choice_program_id;
                     $tmp['second_choice_program_id'] = $value->second_choice_program_id;
                     $tmp['second_program'] = "";
@@ -5141,36 +3057,17 @@ exit;*/
                     $tmp['second_choice'] = $value->second_choice;
                     $tmp['cdi'] = $cdiArr;
                     $tmp['rank'] = $this->priorityCalculate($value, "first");
-                    if($value->cdi_override == "Y")
+                    if ($value->cdi_override == "Y")
                         $tmp['cdi_status'] = "Pass";
                     else
-                        if($failed == true)
-                        {
-                            $tmp['cdi_status'] = "NA";
-                        }
-                        else
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
-                    $tmp['magnet_employee'] = $value->mcp_employee;
-                    $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-                    if(!isset($this->eligibility_grade_pass[$value->id]['first']))
-                    {
-                        $tmp['grade_status'] = "NA";
-                    }
-                    else
-                    {
-                        if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
+                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                    if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
                     }
                     $firstdata[] = $tmp;
-                }
-                else
-                {
+                } else {
                     $tmp = $this->convertToArray($value);
                     $tmp['second_program'] = getApplicationProgramName($value->second_choice);
                     $tmp['first_choice_program_id'] = $value->first_choice_program_id;
@@ -5181,41 +3078,956 @@ exit;*/
                     $tmp['second_choice'] = $value->second_choice;
                     $tmp['cdi'] = $cdiArr;
                     $tmp['rank'] = $this->priorityCalculate($value, "second");
-                    $tmp['magnet_employee'] = $value->mcp_employee;
-                    $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-                    if(!isset($this->eligibility_grade_pass[$value->id]['second']))
-                    {
-                        $tmp['grade_status'] = "NA";
+                    if ($this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
                     }
-                    else
-                    {
-                        if($this->eligibility_grade_pass[$value->id]['second'] == "Pass")
-                        {
-                            $tmp['grade_status'] = "Pass";
-                        }
-                        else
-                        {
-                            $tmp['grade_status'] = "Fail";
-                        }
-                    }
-                    if($value->cdi_override == "Y")
-                        $tmp['cdi_status'] = "Pass";
-                    else
-                        if($failed == true)
-                        {
-                            $tmp['cdi_status'] = "NA";
-                        }
-                        else
-                            $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
-
-
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
                     $seconddata[] = $tmp;
                 }
-            
-
+            } else {
+                $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
+                if (!empty($cdi_data)) {
+                    $incomplete_reason = "Grade";
+                } else {
+                    $incomplete_reason = "Both";
+                }
+                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value->id, "version" => $version], ["first_choice_final_status" => "Denied Due To Incomplete Records", "first_offered_rank" => 0, "first_waitlist_for" => $value['first_choice_program_id'], "second_choice_final_status" => "Denied Due To Incomplete Records", "second_offered_rank" => 0, "second_waitlist_for" => $value['second_choice_program_id'], 'incomplete_reason' => $incomplete_reason, "version" => $version]);
+            }
+        }
+        if (!empty($firstdata)) {
+            $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
+            foreach ($firstdata as $key => $value) {
+                $f_siblings['rank'][] = $value['rank'];
+                $f_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC, $firstdata);
         }
 
-       /*
+        if (!empty($seconddata)) {
+            foreach ($seconddata as $key => $value) {
+                $s_siblings['rank'][] = $value['rank'];
+                $s_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC, $seconddata);
+        }
+        //$tmpAvailability = $availabilityArray;
+        $waitlistArr = $offeredRank = $firstOffered = array();
+
+        foreach ($firstdata as $key => $value) {
+            if ($value['grade_status'] == "Pass" && $value['cdi_status'] == "Pass") {
+                if (isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']])) {
+
+                    if ($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0) {
+                        $firstdata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
+                        $firstOffered[] = $value['id'];
+                        if (isset($offeredRank[$value['first_choice_program_id']])) {
+                            $offeredRank[$value['first_choice_program_id']] = $offeredRank[$value['first_choice_program_id']] + 1;
+                        } else {
+                            $offeredRank[$value['first_choice_program_id']] = 1;
+                        }
+
+                        $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] - 1;
+                        do {
+                            $code = mt_rand(100000, 999999);
+                            $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
+                        } while (!empty($user_code));
+                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Offered", "first_offered_rank" => $offeredRank[$value['first_choice_program_id']], "first_waitlist_for" => $value['first_choice_program_id'], 'offer_slug' => $code, "version" => $version]);
+                        $pname = getProgramName($value['first_choice_program_id']);
+                        $rU = Submissions::where("id", $value['id'])->update(array("awarded_school" => $pname));
+                    } else {
+                        $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                        if (isset($waitlistArr[$value['first_choice_program_id']])) {
+                            $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                        } else {
+                            $waitlistArr[$value['first_choice_program_id']] = 1;
+                        }
+
+                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']], "version" => $version]);
+                    }
+                } else {
+                    $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                    if (isset($waitlistArr[$value['first_choice_program_id']])) {
+                        $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                    } else {
+                        $waitlistArr[$value['first_choice_program_id']] = 1;
+                    }
+                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']], "version" => $version]);
+                }
+            } else {
+                $firstdata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Eligibility</div>";
+                if ($value['cdi_status'] == "Fail" && $value['grade_status'] == "Fail") {
+                    $first_choice_eligibility_reason = "Both";
+                } elseif ($value['cdi_status'] == "Fail") {
+                    $first_choice_eligibility_reason = "CDI";
+                } else {
+                    $first_choice_eligibility_reason = "Grade";
+                }
+
+                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["first_choice_final_status" => "Denied due to Ineligibility", "first_waitlist_for" => $value['first_choice_program_id'], "first_choice_eligibility_reason" => $first_choice_eligibility_reason, "version" => $version, "second_choice_final_status" => "Denied due to Ineligibility", "second_waitlist_for" => $value['second_choice_program_id']]);
+            }
+        }
+
+        foreach ($seconddata as $key => $value) {
+            if ($value['grade_status'] == "Pass" && $value['cdi_status'] == "Pass") {
+                if (isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']])) {
+                    if ($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered)) {
+                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
+                        $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
+
+                        if (isset($offeredRank[$value['second_choice_program_id']])) {
+                            $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
+                        } else {
+                            $offeredRank[$value['second_choice_program_id']] = 1;
+                        }
+                        do {
+                            $code = mt_rand(100000, 999999);
+                            $user_code = LateSubmissionFinalStatus::where('offer_slug', $code)->first();
+                        } while (!empty($user_code));
+
+                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Offered", "second_offered_rank" => $offeredRank[$value['second_choice_program_id']], "second_waitlist_for" => $value['second_choice_program_id'], 'offer_slug' => $code, "version" => $version]);
+                        $pname = getProgramName($value['second_choice_program_id']);
+                        $rU = Submissions::where("id", $value['id'])->update(array("awarded_school" => $pname));
+                    } else {
+                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                        if (isset($waitlistArr[$value['second_choice_program_id']])) {
+                            $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
+                        } else {
+                            $waitlistArr[$value['second_choice_program_id']] = 1;
+                        }
+
+                        $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']], "version" => $version]);
+                    }
+                } else {
+                    $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                    if (isset($waitlistArr[$value['second_choice_program_id']])) {
+                        $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
+                    } else {
+                        $waitlistArr[$value['second_choice_program_id']] = 1;
+                    }
+                    $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']], "version" => $version]);
+                }
+            } else {
+                $seconddata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Ineligibility</div>";
+                if ($value['cdi_status'] == "Fail" && $value['grade_status'] == "Fail") {
+                    $second_choice_eligibility_reason = "Both";
+                } elseif ($value['cdi_status'] == "Fail") {
+                    $second_choice_eligibility_reason = "CDI";
+                } else {
+                    $second_choice_eligibility_reason = "Grade";
+                }
+
+                $rs = LateSubmissionFinalStatus::updateOrCreate(["submission_id" => $value['id'], "version" => $version], ["second_choice_final_status" => "Denied due to Ineligibility", "second_waitlist_for" => $value['second_choice_program_id'], "second_choice_eligibility_reason" => $second_choice_eligibility_reason, "version" => $version, "first_choice_final_status" => "Denied due to Ineligibility", "first_waitlist_for" => $value['first_choice_program_id']]);
+            }
+        }
+    }
+
+    /* Code Ends for Late Submission Process Selection */
+    public function generateStatus()
+    {
+        $availabilityArray = array();
+        $allProgram = Availability::distinct()->where("district_id", Session::get("district_id"))->get(['program_id']);
+        foreach ($allProgram as $key => $value) {
+            $avail_grade = Availability::where("district_id", Session::get("district_id"))->where("program_id", $value->program_id)->get();
+            foreach ($avail_grade as $gkey => $gvalue) {
+                $availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats;
+            }
+        }
+
+
+        $firstData = Submissions::distinct()->where("late_submission", "N")->get(["first_choice"]);
+
+        /* Get Subject and Acardemic Term like Q1.1 Q1.2 etc set for Academic Grade Calculation 
+                For all unique First Choice and Second Choice
+         */
+        $subjects = $terms = array();
+        $eligibilityArr = array();
+        foreach ($firstData as $value) {
+            if ($value->first_choice != "") {
+                $eligibilityData = getEligibilities($value->first_choice, 'Academic Grade Calculation');
+                if (count($eligibilityData) > 0) {
+                    if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
+                        $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
+                        // echo $eligibilityData[0]->id;exit;
+                        $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
+
+                        if (!empty($content)) {
+                            if ($content->scoring->type == "DD") {
+                                $tmp = array();
+
+                                foreach ($content->subjects as $value) {
+                                    if (!in_array($value, $subjects)) {
+                                        $subjects[] = $value;
+                                    }
+                                }
+
+                                foreach ($content->terms_calc as $value) {
+                                    if (!in_array($value, $terms)) {
+                                        $terms[] = $value;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $secondData = Submissions::distinct()->where("late_submission", "N")->get(["second_choice"]);
+        foreach ($secondData as $value) {
+            if ($value->second_choice != "") {
+                $eligibilityData = getEligibilities($value->second_choice, 'Academic Grade Calculation');
+                if (count($eligibilityData) > 0) {
+                    $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
+                    if (!empty($content)) {
+                        if ($content->scoring->type == "DD") {
+                            $tmp = array();
+
+                            foreach ($content->subjects as $value) {
+                                if (!in_array($value, $subjects)) {
+                                    $subjects[] = $value;
+                                }
+                            }
+
+                            foreach ($content->terms_calc as $value) {
+                                if (!in_array($value, $terms)) {
+                                    $terms[] = $value;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /* Get Set Eligibility Data Set for first choice program and second choice program
+         */
+
+        $setEligibilityData = array();
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setEligibilityData))) {
+                $data = getSetEligibilityData($value->first_choice, 3);
+                foreach ($subjects as $svalue) {
+                    foreach ($terms as $tvalue) {
+                        if (isset($data->{$svalue . "-" . $tvalue})) {
+                            $setEligibilityData[$value->first_choice][$svalue . "-" . $tvalue] = $data->{$svalue . "-" . $tvalue}[0];
+                        }
+                        /*                        else
+                            $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
+                    }
+                }
+            }
+        }
+        foreach ($secondData as $value) {
+            if (!in_array($value->second_choice, array_keys($setEligibilityData))) {
+                $data = getSetEligibilityData($value->second_choice, 3);
+                foreach ($subjects as $svalue) {
+                    foreach ($terms as $tvalue) {
+                        if (isset($data->{$svalue . "-" . $tvalue})) {
+                            $setEligibilityData[$value->second_choice][$svalue . "-" . $tvalue] = $data->{$svalue . "-" . $tvalue}[0];
+                        }
+                        /*   else
+                            $setEligibilityData[$value->second_choice][$svalue."-".$tvalue] = 50;*/
+                    }
+                }
+            }
+        }
+
+
+        /* Get CDI Set Eligibility Data Set for first choice program and second choice program
+         */
+
+        $setCDIEligibilityData = array();
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setCDIEligibilityData))) {
+                $data = getSetEligibilityData($value->first_choice, 8);
+                if (!empty($data)) {
+                    $setCDIEligibilityData[$value->first_choice]['b_info'] = $data->B[0];
+                    $setCDIEligibilityData[$value->first_choice]['c_info'] = $data->C[0];
+                    $setCDIEligibilityData[$value->first_choice]['d_info'] = $data->D[0];
+                    $setCDIEligibilityData[$value->first_choice]['e_info'] = $data->E[0];
+                    $setCDIEligibilityData[$value->first_choice]['susp'] = $data->Susp[0];
+                    $setCDIEligibilityData[$value->first_choice]['susp_days'] = $data->SuspDays[0];
+                }
+            }
+        }
+        foreach ($secondData as $value) {
+            if (!in_array($value->second_choice, array_keys($setCDIEligibilityData))) {
+                $data = getSetEligibilityData($value->second_choice, 8);
+                if (!empty($data)) {
+                    $setCDIEligibilityData[$value->second_choice]['b_info'] = $data->B[0];
+                    $setCDIEligibilityData[$value->second_choice]['c_info'] = $data->C[0];
+                    $setCDIEligibilityData[$value->second_choice]['d_info'] = $data->D[0];
+                    $setCDIEligibilityData[$value->second_choice]['e_info'] = $data->E[0];
+                    $setCDIEligibilityData[$value->second_choice]['susp'] = $data->Susp[0];
+                    $setCDIEligibilityData[$value->second_choice]['susp_days'] = $data->SuspDays[0];
+                }
+            }
+        }
+        /* Get CDI Data */
+        $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))
+            ->whereIn('submission_status', array("Active", "Pending"))
+            ->where("late_submission", "N")
+            //            ->limit(5)
+            ->get();
+
+
+        $firstdata = $seconddata = array();
+        $programGrades = array();
+        foreach ($submissions as $key => $value) {
+            if (!isset($programGrades[$value->first_choice_program_id])) {
+                $availableGrades = array();
+                $eligibilityData = getEligibilitiesByProgram($value->first_choice_program_id, 'Academic Grade Calculation');
+                if (isset($eligibilityData[0])) {
+                    $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
+                    $programGrades[$value->first_choice_program_id] = $availableGrades;
+                }
+            }
+            $skip = false;
+            if ($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id])) {
+                $skip = true;
+            }
+
+            if ($value->second_choice_program_id != '' && $value->second_choice_program_id != '0') {
+                if (!isset($programGrades[$value->second_choice_program_id])) {
+                    $availableGrades = array();
+                    $eligibilityData = getEligibilitiesByProgram($value->second_choice_program_id, 'Academic Grade Calculation');
+                    if (isset($eligibilityData[0])) {
+                        $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
+                        $programGrades[$value->second_choice_program_id] = $availableGrades;
+                    }
+                }
+                if (!in_array($value->next_grade, $programGrades[$value->second_choice_program_id])) {
+                    $skip = true;
+                }
+            }
+
+            $score = $this->collectionStudentGradeReport($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData);
+            if (count($score) > 0) {
+
+                if ($skip) {
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = "NA";
+                    $cdiArr['c_info'] = "NA";
+                    $cdiArr['d_info'] = "NA";
+                    $cdiArr['e_info'] = "NA";
+                    $cdiArr['susp'] = "NA";
+                    $cdiArr['susp_days'] = "NA";
+                } else {
+                    $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
+                    if (!empty($cdi_data)) {
+                        $cdiArr = array();
+                        $cdiArr['b_info'] = $cdi_data->b_info;
+                        $cdiArr['c_info'] = $cdi_data->c_info;
+                        $cdiArr['d_info'] = $cdi_data->d_info;
+                        $cdiArr['e_info'] = $cdi_data->e_info;
+                        $cdiArr['susp'] = $cdi_data->susp;
+                        $cdiArr['susp_days'] = $cdi_data->susp_days;
+                    } elseif ($value->cdi_override == "Y") {
+                        $cdiArr = array();
+                        $cdiArr['b_info'] = 0;
+                        $cdiArr['c_info'] = 0;
+                        $cdiArr['d_info'] = 0;
+                        $cdiArr['e_info'] = 0;
+                        $cdiArr['susp'] = 0;
+                        $cdiArr['susp_days'] = 0;
+                    } else {
+                        $incomplete_reason = "CDI";
+                        $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value->id], ["first_choice_final_status" => "Denied Due To Incomplete Records", "first_offered_rank" => 0, "first_waitlist_for" => $value['first_choice_program_id'], "second_choice_final_status" => "Denied Due To Incomplete Records", "second_offered_rank" => 0, "second_waitlist_for" => $value['second_choice_program_id'], 'incomplete_reason' => $incomplete_reason]);
+                        continue;
+                    }
+                }
+                if ($value->first_choice != "" && $value->second_choice != "") {
+
+                    $tmp = $this->convertToArray($value);
+                    $choice = getApplicationProgramName($value->first_choice);
+                    $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                    $tmp['first_choice'] = $value->first_choice;
+                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                    $tmp['second_choice'] = $value->second_choice;
+                    $tmp['second_program'] = "";
+                    $tmp['score'] = $score;
+                    $tmp['cdi'] = $cdiArr;
+                    if ($value->cdi_override == "Y")
+                        $tmp['cdi_status'] = "Pass";
+                    else {
+                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                    }
+                    $tmp['rank'] = $this->priorityCalculate($value, "first");
+                    if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
+                    }
+                    $firstdata[] = $tmp;
+
+                    if ($this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
+                    }
+                    $tmp['rank'] = $this->priorityCalculate($value, "second");
+                    if ($value->cdi_override == "Y")
+                        $tmp['cdi_status'] = "Pass";
+                    else
+                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
+                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                    $tmp['first_program'] = "";
+                    $tmp['score'] = $score;
+                    $tmp['cdi'] = $cdiArr;
+                    $seconddata[] = $tmp;
+                } elseif ($value->first_choice != "") {
+                    $tmp = $this->convertToArray($value);
+                    $choice = getApplicationProgramName($value->first_choice);
+                    $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                    $tmp['second_program'] = "";
+                    $tmp['score'] = $score;
+                    $tmp['first_choice'] = $value->first_choice;
+                    $tmp['second_choice'] = $value->second_choice;
+                    $tmp['cdi'] = $cdiArr;
+                    $tmp['rank'] = $this->priorityCalculate($value, "first");
+                    if ($value->cdi_override == "Y")
+                        $tmp['cdi_status'] = "Pass";
+                    else
+                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                    if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
+                    }
+                    $firstdata[] = $tmp;
+                } else {
+                    $tmp = $this->convertToArray($value);
+                    $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                    $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                    $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                    $tmp['first_program'] = "";
+                    $tmp['score'] = $score;
+                    $tmp['first_choice'] = $value->first_choice;
+                    $tmp['second_choice'] = $value->second_choice;
+                    $tmp['cdi'] = $cdiArr;
+                    $tmp['rank'] = $this->priorityCalculate($value, "second");
+                    if ($this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
+                    }
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
+                    $seconddata[] = $tmp;
+                }
+            } else {
+                $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
+                if (!empty($cdi_data)) {
+                    $incomplete_reason = "Grade";
+                } else {
+                    $incomplete_reason = "Both";
+                }
+                $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value->id], ["first_choice_final_status" => "Denied Due To Incomplete Records", "first_offered_rank" => 0, "first_waitlist_for" => $value['first_choice_program_id'], "second_choice_final_status" => "Denied Due To Incomplete Records", "second_offered_rank" => 0, "second_waitlist_for" => $value['second_choice_program_id'], 'incomplete_reason' => $incomplete_reason]);
+            }
+        }
+
+        if (!empty($firstdata)) {
+            $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
+            foreach ($firstdata as $key => $value) {
+                $f_siblings['rank'][] = $value['rank'];
+                $f_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC, $firstdata);
+        }
+
+        if (!empty($seconddata)) {
+            foreach ($seconddata as $key => $value) {
+                $s_siblings['rank'][] = $value['rank'];
+                $s_lottery_numbers['lottery_number'][] = $value['lottery_number'];
+            }
+            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC, $seconddata);
+        }
+
+        $tmpAvailability = $availabilityArray;
+        $waitlistArr = $offeredRank = $firstOffered = array();
+        foreach ($firstdata as $key => $value) {
+            if ($value['grade_status'] == "Pass" && $value['cdi_status'] == "Pass") {
+                if (isset($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']])) {
+
+                    if ($tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] > 0) {
+                        $firstdata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
+                        $firstOffered[] = $value['id'];
+                        if (isset($offeredRank[$value['first_choice_program_id']])) {
+                            $offeredRank[$value['first_choice_program_id']] = $offeredRank[$value['first_choice_program_id']] + 1;
+                        } else {
+                            $offeredRank[$value['first_choice_program_id']] = 1;
+                        }
+
+                        $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['first_choice_program_id']][$value['next_grade']] - 1;
+                        do {
+                            $code = mt_rand(100000, 999999);
+                            $user_code = SubmissionsFinalStatus::where('offer_slug', $code)->first();
+                        } while (!empty($user_code));
+                        $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["first_choice_final_status" => "Offered", "first_offered_rank" => $offeredRank[$value['first_choice_program_id']], "first_waitlist_for" => $value['first_choice_program_id'], 'offer_slug' => $code]);
+                        $pname = getProgramName($value['first_choice_program_id']);
+                        $rU = Submissions::where("id", $value['id'])->update(array("awarded_school" => $pname));
+                    } else {
+                        $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                        if (isset($waitlistArr[$value['first_choice_program_id']])) {
+                            $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                        } else {
+                            $waitlistArr[$value['first_choice_program_id']] = 1;
+                        }
+
+                        $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']]]);
+                    }
+                } else {
+                    $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                    if (isset($waitlistArr[$value['first_choice_program_id']])) {
+                        $waitlistArr[$value['first_choice_program_id']] = $waitlistArr[$value['first_choice_program_id']] + 1;
+                    } else {
+                        $waitlistArr[$value['first_choice_program_id']] = 1;
+                    }
+                    $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["first_choice_final_status" => "Waitlisted", "first_waitlist_for" => $value['first_choice_program_id'], "first_waitlist_number" => $waitlistArr[$value['first_choice_program_id']]]);
+                }
+            } else {
+                $firstdata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Eligibility</div>";
+                if ($value['cdi_status'] == "Fail" && $value['grade_status'] == "Fail") {
+                    $first_choice_eligibility_reason = "Both";
+                } elseif ($value['cdi_status'] == "Fail") {
+                    $first_choice_eligibility_reason = "CDI";
+                } else {
+                    $first_choice_eligibility_reason = "Grade";
+                }
+
+                $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["first_choice_final_status" => "Denied due to Ineligibility", "first_waitlist_for" => $value['first_choice_program_id'], "first_choice_eligibility_reason" => $first_choice_eligibility_reason]);
+            }
+        }
+
+        foreach ($seconddata as $key => $value) {
+            if ($value['grade_status'] == "Pass" && $value['cdi_status'] == "Pass") {
+                if (isset($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']])) {
+                    if ($tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] > 0 && !in_array($value['id'], $firstOffered)) {
+                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
+                        $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] = $tmpAvailability[$value['second_choice_program_id']][$value['next_grade']] - 1;
+
+                        if (isset($offeredRank[$value['second_choice_program_id']])) {
+                            $offeredRank[$value['second_choice_program_id']] = $offeredRank[$value['second_choice_program_id']] + 1;
+                        } else {
+                            $offeredRank[$value['second_choice_program_id']] = 1;
+                        }
+                        do {
+                            $code = mt_rand(100000, 999999);
+                            $user_code = SubmissionsFinalStatus::where('offer_slug', $code)->first();
+                        } while (!empty($user_code));
+
+                        $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["second_choice_final_status" => "Offered", "second_offered_rank" => $offeredRank[$value['second_choice_program_id']], "second_waitlist_for" => $value['second_choice_program_id'], 'offer_slug' => $code]);
+                        $pname = getProgramName($value['second_choice_program_id']);
+                        $rU = Submissions::where("id", $value['id'])->update(array("awarded_school" => $pname));
+                    } else {
+                        $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                        if (isset($waitlistArr[$value['second_choice_program_id']])) {
+                            $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
+                        } else {
+                            $waitlistArr[$value['second_choice_program_id']] = 1;
+                        }
+
+                        $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']]]);
+                    }
+                } else {
+                    $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
+                    if (isset($waitlistArr[$value['second_choice_program_id']])) {
+                        $waitlistArr[$value['second_choice_program_id']] = $waitlistArr[$value['second_choice_program_id']] + 1;
+                    } else {
+                        $waitlistArr[$value['second_choice_program_id']] = 1;
+                    }
+                    $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["second_choice_final_status" => "Waitlisted", "second_waitlist_for" => $value['second_choice_program_id'], "second_waitlist_number" => $waitlistArr[$value['second_choice_program_id']]]);
+                }
+            } else {
+                $seconddata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Ineligibility</div>";
+                if ($value['cdi_status'] == "Fail" && $value['grade_status'] == "Fail") {
+                    $second_choice_eligibility_reason = "Both";
+                } elseif ($value['cdi_status'] == "Fail") {
+                    $second_choice_eligibility_reason = "CDI";
+                } else {
+                    $second_choice_eligibility_reason = "Grade";
+                }
+
+                $rs = SubmissionsFinalStatus::updateOrCreate(["submission_id" => $value['id']], ["second_choice_final_status" => "Denied due to Ineligibility", "second_waitlist_for" => $value['second_choice_program_id'], "second_choice_eligibility_reason" => $second_choice_eligibility_reason]);
+            }
+        }
+    }
+
+    public function index($grade = 0)
+    {
+
+        $settings = DB::table("reports_hide_option")->first();
+        $availabilityArray = array();
+        $allProgram = Availability::distinct()->where("district_id", Session::get("district_id"))->get(['program_id']);
+        foreach ($allProgram as $key => $value) {
+            $avail_grade = Availability::where("district_id", Session::get("district_id"))->where("program_id", $value->program_id)->get();
+            foreach ($avail_grade as $gkey => $gvalue) {
+                $availabilityArray[$value->program_id][$gvalue->grade] = $gvalue->available_seats;
+            }
+        }
+
+        /* Get Next Grade Unique for Tabbing */
+        $grade_data = Submissions::distinct()->where('next_grade', '<>', '')->orderBy('next_grade', 'DESC')->get(["next_grade"]);
+        $gradeArr = array("K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
+        $fgradeTab = [];
+        foreach ($grade_data as $key => $value) {
+            $fgradeTab[] = $value->next_grade;
+        }
+        $gradeTab = [];
+        foreach ($gradeArr as $key => $value) {
+            if (in_array($value, $fgradeTab))
+                $gradeTab[] = $value;
+        }
+
+        if ($grade == 0)
+            $existGrade = $gradeTab[0];
+        else
+            $existGrade = $grade;
+
+        $firstData = Submissions::distinct()->get(["first_choice"]);
+
+        /* Get Subject and Acardemic Term like Q1.1 Q1.2 etc set for Academic Grade Calculation 
+                For all unique First Choice and Second Choice
+         */
+        $subjects = $terms = array();
+        $eligibilityArr = array();
+        foreach ($firstData as $value) {
+            if ($value->first_choice != "") {
+                $eligibilityData = getEligibilities($value->first_choice, 'Academic Grade Calculation');
+                if (count($eligibilityData) > 0) {
+                    if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
+                        $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
+                        // echo $eligibilityData[0]->id;exit;
+                        $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
+
+                        if (!empty($content)) {
+                            if ($content->scoring->type == "DD") {
+                                $tmp = array();
+
+                                foreach ($content->subjects as $value) {
+                                    if (!in_array($value, $subjects)) {
+                                        $subjects[] = $value;
+                                    }
+                                }
+
+                                foreach ($content->terms_calc as $value) {
+                                    if (!in_array($value, $terms)) {
+                                        $terms[] = $value;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $secondData = Submissions::distinct()->get(["second_choice"]);
+        foreach ($secondData as $value) {
+            if ($value->second_choice != "") {
+                $eligibilityData = getEligibilities($value->second_choice, 'Academic Grade Calculation');
+                if (count($eligibilityData) > 0) {
+                    $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
+                    if (!empty($content)) {
+                        if ($content->scoring->type == "DD") {
+                            $tmp = array();
+
+                            foreach ($content->subjects as $value) {
+                                if (!in_array($value, $subjects)) {
+                                    $subjects[] = $value;
+                                }
+                            }
+
+                            foreach ($content->terms_calc as $value) {
+                                if (!in_array($value, $terms)) {
+                                    $terms[] = $value;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /* Get Set Eligibility Data Set for first choice program and second choice program
+         */
+
+        $setEligibilityData = array();
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setEligibilityData))) {
+                $data = getSetEligibilityData($value->first_choice, 3);
+                foreach ($subjects as $svalue) {
+                    foreach ($terms as $tvalue) {
+                        if (isset($data->{$svalue . "-" . $tvalue})) {
+                            $setEligibilityData[$value->first_choice][$svalue . "-" . $tvalue] = $data->{$svalue . "-" . $tvalue}[0];
+                        }
+                        /*                        else
+                            $setEligibilityData[$value->first_choice][$svalue."-".$tvalue] = 50;*/
+                    }
+                }
+            }
+        }
+        foreach ($secondData as $value) {
+            if (!in_array($value->second_choice, array_keys($setEligibilityData))) {
+                $data = getSetEligibilityData($value->second_choice, 3);
+                foreach ($subjects as $svalue) {
+                    foreach ($terms as $tvalue) {
+                        if (isset($data->{$svalue . "-" . $tvalue})) {
+                            $setEligibilityData[$value->second_choice][$svalue . "-" . $tvalue] = $data->{$svalue . "-" . $tvalue}[0];
+                        }
+                        /*   else
+                            $setEligibilityData[$value->second_choice][$svalue."-".$tvalue] = 50;*/
+                    }
+                }
+            }
+        }
+
+
+        /* Get CDI Set Eligibility Data Set for first choice program and second choice program
+         */
+
+        $setCDIEligibilityData = array();
+        foreach ($firstData as $value) {
+            if (!in_array($value->first_choice, array_keys($setCDIEligibilityData))) {
+                $data = getSetEligibilityData($value->first_choice, 8);
+                if (!empty($data)) {
+                    $setCDIEligibilityData[$value->first_choice]['b_info'] = $data->B[0];
+                    $setCDIEligibilityData[$value->first_choice]['c_info'] = $data->C[0];
+                    $setCDIEligibilityData[$value->first_choice]['d_info'] = $data->D[0];
+                    $setCDIEligibilityData[$value->first_choice]['e_info'] = $data->E[0];
+                    $setCDIEligibilityData[$value->first_choice]['susp'] = $data->Susp[0];
+                    $setCDIEligibilityData[$value->first_choice]['susp_days'] = $data->SuspDays[0];
+                }
+            }
+        }
+        foreach ($secondData as $value) {
+            if (!in_array($value->second_choice, array_keys($setCDIEligibilityData))) {
+                $data = getSetEligibilityData($value->second_choice, 8);
+                if (!empty($data)) {
+                    $setCDIEligibilityData[$value->second_choice]['b_info'] = $data->B[0];
+                    $setCDIEligibilityData[$value->second_choice]['c_info'] = $data->C[0];
+                    $setCDIEligibilityData[$value->second_choice]['d_info'] = $data->D[0];
+                    $setCDIEligibilityData[$value->second_choice]['e_info'] = $data->E[0];
+                    $setCDIEligibilityData[$value->second_choice]['susp'] = $data->Susp[0];
+                    $setCDIEligibilityData[$value->second_choice]['susp_days'] = $data->SuspDays[0];
+                }
+            }
+        }
+        /* Get CDI Data */
+        $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))
+            ->where('next_grade', $existGrade)
+            ->where('submission_status', array("Active", "Pending"))
+            //            ->limit(5)
+            ->get();
+
+
+        $firstdata = $seconddata = array();
+        $programGrades = array();
+        foreach ($submissions as $key => $value) {
+            $failed = false;
+            if (!isset($programGrades[$value->first_choice_program_id])) {
+                $availableGrades = array();
+                $eligibilityData = getEligibilitiesByProgram($value->first_choice_program_id, 'Academic Grade Calculation');
+                if (isset($eligibilityData[0])) {
+                    $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
+                    $programGrades[$value->first_choice_program_id] = $availableGrades;
+                }
+            }
+            $skip = false;
+            if ($value->first_choice_program_id != 0 && !in_array($value->next_grade, $programGrades[$value->first_choice_program_id])) {
+                $skip = true;
+            }
+
+            if ($value->second_choice_program_id != '' && $value->second_choice_program_id != '0') {
+                if (!isset($programGrades[$value->second_choice_program_id])) {
+                    $availableGrades = array();
+                    $eligibilityData = getEligibilitiesByProgram($value->second_choice_program_id, 'Academic Grade Calculation');
+                    if (isset($eligibilityData[0])) {
+                        $availableGrades = explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by);
+                        $programGrades[$value->second_choice_program_id] = $availableGrades;
+                    }
+                }
+                if (!in_array($value->next_grade, $programGrades[$value->second_choice_program_id])) {
+                    $skip = true;
+                }
+            }
+
+            $score = $this->collectionStudentGradeReport($value, $subjects, $terms, $value->next_grade, $skip, $setEligibilityData);
+            if (count($score) <= 0) {
+                $failed = true;
+                $score = array();
+                foreach ($subjects as $svalue) {
+                    foreach ($terms as $svalue1) {
+                        $score[$svalue][$svalue1] = "";
+                    }
+                }
+            }
+
+            if ($skip) {
+                $cdiArr = array();
+                $cdiArr['b_info'] = "NA";
+                $cdiArr['c_info'] = "NA";
+                $cdiArr['d_info'] = "NA";
+                $cdiArr['e_info'] = "NA";
+                $cdiArr['susp'] = "NA";
+                $cdiArr['susp_days'] = "NA";
+            } else {
+                $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
+                if (!empty($cdi_data)) {
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = $cdi_data->b_info;
+                    $cdiArr['c_info'] = $cdi_data->c_info;
+                    $cdiArr['d_info'] = $cdi_data->d_info;
+                    $cdiArr['e_info'] = $cdi_data->e_info;
+                    $cdiArr['susp'] = $cdi_data->susp;
+                    $cdiArr['susp_days'] = $cdi_data->susp_days;
+                } elseif ($value->cdi_override == "Y") {
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = 0;
+                    $cdiArr['c_info'] = 0;
+                    $cdiArr['d_info'] = 0;
+                    $cdiArr['e_info'] = 0;
+                    $cdiArr['susp'] = 0;
+                    $cdiArr['susp_days'] = 0;
+                } else {
+                    $failed = true;
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = "";
+                    $cdiArr['c_info'] = "";
+                    $cdiArr['d_info'] = "";
+                    $cdiArr['e_info'] = "";
+                    $cdiArr['susp'] = "";
+                    $cdiArr['susp_days'] = "";
+                }
+            }
+            if ($value->first_choice != "" && $value->second_choice != "") {
+
+
+                $tmp = $this->convertToArray($value);
+                $choice = getApplicationProgramName($value->first_choice);
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['second_program'] = "";
+                $tmp['score'] = $score;
+                $tmp['cdi'] = $cdiArr;
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                }
+                $tmp['rank'] = $this->priorityCalculate($value, "first");
+                $tmp['magnet_employee'] = $value->mcp_employee;
+                $tmp['magnet_program_employee'] = $value->magnet_program_employee;
+                if (!isset($this->eligibility_grade_pass[$value->id]['first'])) {
+                    $tmp['grade_status'] = "NA";
+                } else {
+                    if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
+                    }
+                }
+                $firstdata[] = $tmp;
+
+                if (!isset($this->eligibility_grade_pass[$value->id]['second'])) {
+                    $tmp['grade_status'] = "NA";
+                } else {
+                    if ($this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
+                    }
+                }
+                $tmp['rank'] = $this->priorityCalculate($value, "second");
+
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else {
+                    if ($failed == true) {
+                        $tmp['cdi_status'] = "NA";
+                    } else
+                        $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
+                }
+
+                $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                $tmp['first_program'] = "";
+                $tmp['score'] = $score;
+                $tmp['cdi'] = $cdiArr;
+                $seconddata[] = $tmp;
+            } elseif ($value->first_choice != "") {
+                $tmp = $this->convertToArray($value);
+                $choice = getApplicationProgramName($value->first_choice);
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['second_program'] = "";
+                $tmp['score'] = $score;
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['cdi'] = $cdiArr;
+                $tmp['rank'] = $this->priorityCalculate($value, "first");
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else
+                        if ($failed == true) {
+                    $tmp['cdi_status'] = "NA";
+                } else
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->first_choice);
+                $tmp['magnet_employee'] = $value->mcp_employee;
+                $tmp['magnet_program_employee'] = $value->magnet_program_employee;
+                if (!isset($this->eligibility_grade_pass[$value->id]['first'])) {
+                    $tmp['grade_status'] = "NA";
+                } else {
+                    if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
+                    }
+                }
+                $firstdata[] = $tmp;
+            } else {
+                $tmp = $this->convertToArray($value);
+                $tmp['second_program'] = getApplicationProgramName($value->second_choice);
+                $tmp['first_choice_program_id'] = $value->first_choice_program_id;
+                $tmp['second_choice_program_id'] = $value->second_choice_program_id;
+                $tmp['first_program'] = "";
+                $tmp['score'] = $score;
+                $tmp['first_choice'] = $value->first_choice;
+                $tmp['second_choice'] = $value->second_choice;
+                $tmp['cdi'] = $cdiArr;
+                $tmp['rank'] = $this->priorityCalculate($value, "second");
+                $tmp['magnet_employee'] = $value->mcp_employee;
+                $tmp['magnet_program_employee'] = $value->magnet_program_employee;
+                if (!isset($this->eligibility_grade_pass[$value->id]['second'])) {
+                    $tmp['grade_status'] = "NA";
+                } else {
+                    if ($this->eligibility_grade_pass[$value->id]['second'] == "Pass") {
+                        $tmp['grade_status'] = "Pass";
+                    } else {
+                        $tmp['grade_status'] = "Fail";
+                    }
+                }
+                if ($value->cdi_override == "Y")
+                    $tmp['cdi_status'] = "Pass";
+                else
+                        if ($failed == true) {
+                    $tmp['cdi_status'] = "NA";
+                } else
+                    $tmp['cdi_status'] = $this->checkCDIStatus($setCDIEligibilityData, $cdiArr, $value->second_choice);
+
+
+                $seconddata[] = $tmp;
+            }
+        }
+
+        /*
         $fdata = array();
         $count = 0;
         foreach($firstdata as $key=>$value)
@@ -5260,76 +4072,64 @@ exit;*/
         print_r($seconddata);
        exit;*/
 
-       if(!empty($firstdata))
-       {
+        if (!empty($firstdata)) {
             $f_siblings = $s_siblings = $f_lottery_numbers = $s_lottery_numbers = $f_status = $s_status = array();
-            foreach($firstdata as $key=>$value)
-            {
-                $f_siblings['rank'][] = $value['rank']; 
-                $f_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+            foreach ($firstdata as $key => $value) {
+                $f_siblings['rank'][] = $value['rank'];
+                $f_lottery_numbers['lottery_number'][] = $value['lottery_number'];
             }
-            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC,$firstdata);
+            array_multisort($f_siblings['rank'], SORT_ASC, $f_lottery_numbers['lottery_number'], SORT_DESC, $firstdata);
         }
 
-        if(!empty($seconddata))
-        {
-            foreach($seconddata as $key=>$value)
-            {
+        if (!empty($seconddata)) {
+            foreach ($seconddata as $key => $value) {
                 $s_siblings['rank'][] = $value['rank'];
-                $s_lottery_numbers['lottery_number'][] = $value['lottery_number']; 
+                $s_lottery_numbers['lottery_number'][] = $value['lottery_number'];
             }
-            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC,$seconddata);
+            array_multisort($s_siblings['rank'], SORT_ASC, $s_lottery_numbers['lottery_number'], SORT_DESC, $seconddata);
         }
 
         $tmpAvailability = $availabilityArray;
         $waitlistArr = $offeredRank = $firstOffered = array();
 
-        foreach($firstdata as $key=>$value)
-        {
+        foreach ($firstdata as $key => $value) {
 
             $rsT = SubmissionsFinalStatus::where("submission_id", $value['id'])->select("first_choice_final_status")->first();
-            if(!empty($rsT))
+            if (!empty($rsT))
                 $status = $rsT->first_choice_final_status;
             else
                 $status = "";
-            if($value['grade_status'] == "NA" || $value['cdi_status'] == "NA")
-            {
+            if ($value['grade_status'] == "NA" || $value['cdi_status'] == "NA") {
                 $firstdata[$key]['final_status'] = "<div class='alert1 alert-info'>Denied due to Incomplete Records</div>";
-            }
-            else
-            {
-                if($status == "Offered")
+            } else {
+                if ($status == "Offered")
                     $firstdata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                elseif($status == "Waitlisted")
+                elseif ($status == "Waitlisted")
                     $firstdata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                elseif($status == "Denied due to Ineligibility")
+                elseif ($status == "Denied due to Ineligibility")
                     $firstdata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Eligibility</div>";
             }
         }
 
 
-        foreach($seconddata as $key=>$value)
-        {
+        foreach ($seconddata as $key => $value) {
 
             $rsT = SubmissionsFinalStatus::where("submission_id", $value['id'])->select("second_choice_final_status")->first();
-            if(!empty($rsT))
+            if (!empty($rsT))
                 $status = $rsT->second_choice_final_status;
             else
                 $status = "";
-            if($value['grade_status'] == "NA" || $value['cdi_status'] == "NA")
-            {
+            if ($value['grade_status'] == "NA" || $value['cdi_status'] == "NA") {
                 $seconddata[$key]['final_status'] = "<div class='alert1 alert-info'>Denied due to Incomplete Records</div>";
-            }
-            else
-            {
-                if($status == "Offered")
+            } else {
+                if ($status == "Offered")
                     $seconddata[$key]['final_status'] = "<div class='alert1 alert-success'>Offered</div>";
-                elseif($status == "Waitlisted")
+                elseif ($status == "Waitlisted")
                     $seconddata[$key]['final_status'] = "<div class='alert1 alert-warning'>Wait Listed</div>";
-                elseif($status == "Denied due to Ineligibility")
+                elseif ($status == "Denied due to Ineligibility")
                     $seconddata[$key]['final_status'] = "<div class='alert1 alert-danger'>Declined due to Eligibility</div>";
-//                else
- //                   echo $value['id']."<BR>";
+                //                else
+                //                   echo $value['id']."<BR>";
             }
         }
 
@@ -5340,13 +4140,10 @@ print_r($seconddata);
 
 exit;*/
 
-        if(str_contains(request()->url(), '/export'))
-        {
+        if (str_contains(request()->url(), '/export')) {
             return $this->exportSubmissions($firstdata, $seconddata, $subjects, $terms);
-        }
-        else
-        {            
-            return view("Reports::index",compact("firstdata", "seconddata", "existGrade", "gradeTab", "subjects", "terms", "setEligibilityData", "setCDIEligibilityData", "settings"));
+        } else {
+            return view("Reports::index", compact("firstdata", "seconddata", "existGrade", "gradeTab", "subjects", "terms", "setEligibilityData", "setCDIEligibilityData", "settings"));
         }
     }
 
@@ -5363,69 +4160,55 @@ exit;*/
     }
 
     /* Missing Grade Report */
-    public function missing($program_id=0)
+    public function missing($program_id = 0)
     {
 
         $application_program = ApplicationProgram::get();
         $aprogram = $programs = array();
         $firstdata = $seconddata = array();
-        foreach($application_program as $key=>$value)
-        {
-            if(!in_array($value->program_id, $programs))
-            {
+        foreach ($application_program as $key => $value) {
+            if (!in_array($value->program_id, $programs)) {
                 $programs[] = $value->program_id;
             }
-            if($value->program_id == $program_id)
-            {
+            if ($value->program_id == $program_id) {
                 $aprogram[] = $value->id;
             }
         }
         $setEligibilityData = array();
-        $submissions=Submissions::
-            where('submissions.district_id', (Session::get('district_id')!=0 ? Session::get('district_id') : 3))
-            ->where(function($q) use ($aprogram) {
+        $submissions = Submissions::where('submissions.district_id', (Session::get('district_id') != 0 ? Session::get('district_id') : 3))
+            ->where(function ($q) use ($aprogram) {
                 $q->whereIn("first_choice", $aprogram)
-                  ->orWhereIn("second_choice", $aprogram);  
+                    ->orWhereIn("second_choice", $aprogram);
             })->get();
         $subjects = $terms = array();
         //print_r($submissions);exit;
         $eligibilityArr = array();
-        foreach($submissions as $value)
-        {
+        foreach ($submissions as $value) {
             $eligibilityData = getEligibilitiesByProgram($program_id, 'Academic Grade Calculation');
-            if(count($eligibilityData) > 0)
-            {
-                if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                {
+            if (count($eligibilityData) > 0) {
+                if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
                     $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                   // echo $eligibilityData[0]->id;exit;
+                    // echo $eligibilityData[0]->id;exit;
                     $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
 
-                    if(!empty($content))
-                    {
-                        if($content->scoring->type=="DD")
-                        {
+                    if (!empty($content)) {
+                        if ($content->scoring->type == "DD") {
                             $tmp = array();
-                            
-                            foreach($content->subjects as $value)
-                            {
-                                if(!in_array($value, $subjects))
-                                {
+
+                            foreach ($content->subjects as $value) {
+                                if (!in_array($value, $subjects)) {
                                     $subjects[] = $value;
                                 }
                             }
 
-                            foreach($content->terms_calc as $value)
-                            {
-                                if(!in_array($value, $terms))
-                                {
+                            foreach ($content->terms_calc as $value) {
+                                if (!in_array($value, $terms)) {
                                     $terms[] = $value;
                                 }
                             }
                         }
-                    }                        
+                    }
                 }
-
             }
         }
 
@@ -5434,15 +4217,13 @@ exit;*/
 
         /* Get CDI Data */
 
-        
-        foreach($submissions as $key=>$value)
-        {
-            
+
+        foreach ($submissions as $key => $value) {
+
             $score = $this->collectionStudentGrade($value->id, $subjects, $terms, "missing", $value->next_grade);
 
             $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-            if(!empty($cdi_data))
-            {
+            if (!empty($cdi_data)) {
                 $cdiArr = array();
                 $cdiArr['b_info'] = $cdi_data->b_info;
                 $cdiArr['c_info'] = $cdi_data->c_info;
@@ -5450,14 +4231,11 @@ exit;*/
                 $cdiArr['e_info'] = $cdi_data->e_info;
                 $cdiArr['susp'] = $cdi_data->susp;
                 $cdiArr['susp_days'] = $cdi_data->susp_days;
-            }
-            else
-            {
+            } else {
                 $cdiArr = array();
 
                 $data = DB::table("student_conduct_disciplinary")->where("stateID", $value->student_id)->first();
-                if(!empty($data))
-                {
+                if (!empty($data)) {
                     $cdi_data = [
                         'submission_id' => $value->id,
                         'b_info' => $data->b_info,
@@ -5475,9 +4253,7 @@ exit;*/
                     $cdiArr['e_info'] = $data->e_info;
                     $cdiArr['susp'] = $data->susp;
                     $cdiArr['susp_days'] = $data->susp_days;
-                }
-                else
-                {
+                } else {
                     $cdiArr['b_info'] = $cdiArr['c_info'] = $cdiArr['d_info'] = $cdi_data['d_info'] = $cdiArr['e_info'] = $cdiArr['susp'] = $cdiArr['susp_days'] = '<i class="fas fa-exclamation-circle text-danger"></i>';
                 }
             }
@@ -5493,30 +4269,26 @@ exit;*/
         }
 
         $seconddata = array();
-        if(str_contains(request()->url(), '/export'))
-        {
+        if (str_contains(request()->url(), '/export')) {
             return $this->exportSubmissions($firstdata, $seconddata, $subjects, $terms);
-        }
-        else
-        {            
-            return view("Reports::missing",compact("firstdata", "seconddata", "subjects", "terms", "programs", "program_id"));
+        } else {
+            return view("Reports::missing", compact("firstdata", "seconddata", "subjects", "terms", "programs", "program_id"));
         }
     }
 
     /* Missing Grade Report */
-    public function missingGradeMain($enrollment_id, $late_submission=0)
+    public function missingGradeMain($enrollment_id, $late_submission = 0)
     {
         $enrollment = Enrollment::where("district_id", Session::get('district_id'))->get();
         $display_outcome = SubmissionsStatusUniqueLog::count();
-        return view("Reports::missing_grade",compact('enrollment_id','enrollment','display_outcome', 'late_submission'));
+        return view("Reports::missing_grade", compact('enrollment_id', 'enrollment', 'display_outcome', 'late_submission'));
     }
-    public function missingGrade($enrollment_id=0, $late_submission=0)
+    public function missingGrade($enrollment_id = 0, $late_submission = 0)
     {
         $program_id = 0;
         $district_id = Session::get("district_id");
         $application_type = Application::where('district_id', $district_id)->where("admin_starting_date", ">=", date("Y-m-d H:i:s"))->where("admin_ending_date", "<=", date("Y-m-d H:i:s"))->first();
-        if(empty($application_type))
-        {
+        if (empty($application_type)) {
             $application_type = Application::orderBy("created_at", "desc")->first();
         }
 
@@ -5536,129 +4308,100 @@ exit;*/
         
         }*/
         $setEligibilityData = array();
-        if($late_submission == 1)
-        {
+        if ($late_submission == 1) {
             $late = "Y";
-        }
-        else
-        {
+        } else {
             $late = "N";
         }
         $late = "Y";
-        if(is_string($enrollment_id) && $enrollment_id == "Non-Current")
-        {
-            $submissions=Submissions::where('submissions.district_id', (Session::get('district_id')!=0 ? Session::get('district_id') : 3))->where('grade_override', 'N')->whereIn('submission_status', array('Active', 'Pending'))->whereNull('student_id')->get();
+        if (is_string($enrollment_id) && $enrollment_id == "Non-Current") {
+            $submissions = Submissions::where('submissions.district_id', (Session::get('district_id') != 0 ? Session::get('district_id') : 3))->where('grade_override', 'N')->whereIn('submission_status', array('Active', 'Pending'))->whereNull('student_id')->get();
+        } else if (is_string($enrollment_id) && $enrollment_id == "Current") {
+            $submissions = Submissions::where('submissions.district_id', (Session::get('district_id') != 0 ? Session::get('district_id') : 3))->where('grade_override', 'N')->whereIn('submission_status', array('Active', 'Pending'))->whereNotNull('student_id')->get();
+        } else {
+            $submissions = Submissions::where('submissions.district_id', (Session::get('district_id') != 0 ? Session::get('district_id') : 3))->where('grade_override', 'N')->whereIn('submission_status', array('Active', 'Pending'))->get();
         }
-        else if(is_string($enrollment_id) && $enrollment_id == "Current")
-        {
-            $submissions=Submissions::where('submissions.district_id', (Session::get('district_id')!=0 ? Session::get('district_id') : 3))->where('grade_override', 'N')->whereIn('submission_status', array('Active', 'Pending'))->whereNotNull('student_id')->get();
-        }
-        else
-        {
-            $submissions=Submissions::where('submissions.district_id', (Session::get('district_id')!=0 ? Session::get('district_id') : 3))->where('grade_override', 'N')->whereIn('submission_status', array('Active', 'Pending'))->get();
-        }
-            //print_r($submissions);exit;
+        //print_r($submissions);exit;
 
         $subjects = $terms = array();
         $eligibilityArr = array();
 
         $availableGrades = array();
-       // $program_id = $programs[0];
+        // $program_id = $programs[0];
 
-             foreach($submissions as $value)
-            {
-                // /second_choice_program_id
-                if($application_type->submission_type == "Late")
-                    $eligibilityData = getEligibilitiesByProgramLateSubmission($value->first_choice_program_id, 'Academic Grade Calculation');
+        foreach ($submissions as $value) {
+            // /second_choice_program_id
+            if ($application_type->submission_type == "Late")
+                $eligibilityData = getEligibilitiesByProgramLateSubmission($value->first_choice_program_id, 'Academic Grade Calculation');
+            else
+                $eligibilityData = getEligibilitiesByProgram($value->first_choice_program_id, 'Academic Grade Calculation');
+
+            if (count($eligibilityData) > 0) {
+                $availableGrades = array_merge(explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by), $availableGrades);
+                if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
+                    $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
+                    // echo $eligibilityData[0]->id;exit;
+                    $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
+
+                    if (!empty($content)) {
+                        if ($content->scoring->type == "DD" || $content->scoring->type == "CLSG") {
+                            $tmp = array();
+
+                            foreach ($content->subjects as $svalue) {
+                                if (!in_array($svalue, $subjects)) {
+                                    $subjects[] = $svalue;
+                                }
+                            }
+
+                            foreach ($content->terms_calc as $tvalue) {
+                                if (!in_array($tvalue, $terms)) {
+                                    $terms[] = $tvalue;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            if ($value->second_choice_program_id > 0) {
+                if ($application_type->submission_type == "Late")
+                    $eligibilityData = getEligibilitiesByProgramLateSubmission($value->second_choice_program_id, 'Academic Grade Calculation');
                 else
-                    $eligibilityData = getEligibilitiesByProgram($value->first_choice_program_id, 'Academic Grade Calculation');
+                    $eligibilityData = getEligibilitiesByProgram($value->second_choice_program_id, 'Academic Grade Calculation');
 
-                if(count($eligibilityData) > 0)
-                {
-                    $availableGrades = array_merge(explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by), $availableGrades); 
-                    if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                    {
+                //$eligibilityData = getEligibilitiesByProgramLateSubmission($value->second_choice_program_id, 'Academic Grade Calculation');
+                if (count($eligibilityData) > 0) {
+                    $availableGrades = array_merge(explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by), $availableGrades);
+                    if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
                         $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                       // echo $eligibilityData[0]->id;exit;
+                        // echo $eligibilityData[0]->id;exit;
                         $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
 
-                        if(!empty($content))
-                        {
-                            if($content->scoring->type=="DD" || $content->scoring->type=="CLSG")
-                            {
+                        if (!empty($content)) {
+                            if ($content->scoring->type == "DD" || $content->scoring->type == "CLSG") {
                                 $tmp = array();
-                                
-                                foreach($content->subjects as $svalue)
-                                {
-                                    if(!in_array($svalue, $subjects))
-                                    {
-                                        $subjects[] = $svalue;
+
+                                foreach ($content->subjects as $value) {
+                                    if (!in_array($value, $subjects)) {
+                                        $subjects[] = $value;
                                     }
                                 }
 
-                                foreach($content->terms_calc as $tvalue)
-                                {
-                                    if(!in_array($tvalue, $terms))
-                                    {
-                                        $terms[] = $tvalue;
+                                foreach ($content->terms_calc as $value) {
+                                    if (!in_array($value, $terms)) {
+                                        $terms[] = $value;
                                     }
                                 }
                             }
-                        }                        
-                    }
-
-                }
-
-
-                if($value->second_choice_program_id > 0)
-                {
-                    if($application_type->submission_type == "Late")
-                        $eligibilityData = getEligibilitiesByProgramLateSubmission($value->second_choice_program_id, 'Academic Grade Calculation');
-                    else
-                        $eligibilityData = getEligibilitiesByProgram($value->second_choice_program_id, 'Academic Grade Calculation');
-
-                    //$eligibilityData = getEligibilitiesByProgramLateSubmission($value->second_choice_program_id, 'Academic Grade Calculation');
-                    if(count($eligibilityData) > 0)
-                    {
-                        $availableGrades = array_merge(explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by), $availableGrades); 
-                        if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                        {
-                            $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                           // echo $eligibilityData[0]->id;exit;
-                            $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
-
-                            if(!empty($content))
-                            {
-                                if($content->scoring->type=="DD" || $content->scoring->type=="CLSG")
-                                {
-                                    $tmp = array();
-                                    
-                                    foreach($content->subjects as $value)
-                                    {
-                                        if(!in_array($value, $subjects))
-                                        {
-                                            $subjects[] = $value;
-                                        }
-                                    }
-
-                                    foreach($content->terms_calc as $value)
-                                    {
-                                        if(!in_array($value, $terms))
-                                        {
-                                            $terms[] = $value;
-                                        }
-                                    }
-                                }
-                            }                        
                         }
-
                     }
-     
                 }
             }
-       
+        }
+
         //print_r($terms);exit;
-       /* foreach($submissions as $value)
+        /* foreach($submissions as $value)
         {
             // /second_choice_program_id
             $eligibilityData = getEligibilitiesByProgram($value->first_choice_program_id, 'Academic Grade Calculation');
@@ -5747,14 +4490,11 @@ exit;*/
         */
 
         /* Get CDI Data */
-        foreach($submissions as $key=>$value)
-        {
-            if(in_array($value->next_grade, $availableGrades))
-            {
+        foreach ($submissions as $key => $value) {
+            if (in_array($value->next_grade, $availableGrades)) {
                 $score = $this->collectionStudentGrade($value->id, $subjects, $terms, "missing", $value->next_grade);
 
-                if(!empty($score))
-                {
+                if (!empty($score)) {
                     $tmp = $this->convertToArray($value);
                     $tmp['score'] = $score;
                     $tmp['submission_id'] = $value->id;
@@ -5770,83 +4510,65 @@ exit;*/
 
         //print_r($firstdata);exit;
         $seconddata = $programs = array();
-        if(str_contains(request()->url(), '/export/missinggrade'))
-        {
+        if (str_contains(request()->url(), '/export/missinggrade')) {
             return $this->exportMissingGrade($firstdata, $subjects, $terms);
-        }
-        else
-        {   
-            $display_outcome = 0;//SubmissionsStatusUniqueLog::count();
-            $returnHTML =  view("Reports::missing_grade_response",compact("firstdata", "seconddata", "subjects", "terms", "programs", "program_id", "enrollment_id", "enrollment","display_outcome","late_submission"))->render();
-            return response()->json(array('success' => true, 'html'=>$returnHTML));         
-
+        } else {
+            $display_outcome = 0; //SubmissionsStatusUniqueLog::count();
+            $returnHTML =  view("Reports::missing_grade_response", compact("firstdata", "seconddata", "subjects", "terms", "programs", "program_id", "enrollment_id", "enrollment", "display_outcome", "late_submission"))->render();
+            return response()->json(array('success' => true, 'html' => $returnHTML));
         }
     }
 
     /* Missing Grade Report */
-    public function missingGradeCopy($program_id=0)
+    public function missingGradeCopy($program_id = 0)
     {
 
         $application_program = ApplicationProgram::get();
         $aprogram = $programs = array();
         $firstdata = $seconddata = array();
-        foreach($application_program as $key=>$value)
-        {
-            if(!in_array($value->program_id, $programs) && $value->program_id != 7)
-            {
+        foreach ($application_program as $key => $value) {
+            if (!in_array($value->program_id, $programs) && $value->program_id != 7) {
                 $programs[] = $value->program_id;
             }
-            if($value->program_id == $program_id)
-            {
+            if ($value->program_id == $program_id) {
                 $aprogram[] = $value->id;
             }
         }
         $setEligibilityData = array();
-        $submissions=Submissions::
-            where('submissions.district_id', (Session::get('district_id')!=0 ? Session::get('district_id') : 3))
-            ->where(function($q) use ($aprogram) {
+        $submissions = Submissions::where('submissions.district_id', (Session::get('district_id') != 0 ? Session::get('district_id') : 3))
+            ->where(function ($q) use ($aprogram) {
                 $q->whereIn("first_choice", $aprogram)
-                  ->orWhereIn("second_choice", $aprogram);  
+                    ->orWhereIn("second_choice", $aprogram);
             })->get();
         $subjects = $terms = array();
         //print_r($submissions);exit;
         $eligibilityArr = array();
-        foreach($submissions as $value)
-        {
+        foreach ($submissions as $value) {
             $eligibilityData = getEligibilitiesByProgram($program_id, 'Academic Grade Calculation');
-            if(count($eligibilityData) > 0)
-            {
-                if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                {
+            if (count($eligibilityData) > 0) {
+                if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
                     $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                   // echo $eligibilityData[0]->id;exit;
+                    // echo $eligibilityData[0]->id;exit;
                     $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
 
-                    if(!empty($content))
-                    {
-                        if($content->scoring->type=="DD")
-                        {
+                    if (!empty($content)) {
+                        if ($content->scoring->type == "DD") {
                             $tmp = array();
-                            
-                            foreach($content->subjects as $value)
-                            {
-                                if(!in_array($value, $subjects))
-                                {
+
+                            foreach ($content->subjects as $value) {
+                                if (!in_array($value, $subjects)) {
                                     $subjects[] = $value;
                                 }
                             }
 
-                            foreach($content->terms_calc as $value)
-                            {
-                                if(!in_array($value, $terms))
-                                {
+                            foreach ($content->terms_calc as $value) {
+                                if (!in_array($value, $terms)) {
                                     $terms[] = $value;
                                 }
                             }
                         }
-                    }                        
+                    }
                 }
-
             }
         }
 
@@ -5855,14 +4577,12 @@ exit;*/
 
         /* Get CDI Data */
 
-        
-        foreach($submissions as $key=>$value)
-        {
-            
+
+        foreach ($submissions as $key => $value) {
+
             $score = $this->collectionStudentGrade($value->id, $subjects, $terms, "missing");
 
-            if(!empty($score))
-            {
+            if (!empty($score)) {
                 $tmp = $this->convertToArray($value);
                 $tmp['score'] = $score;
                 $tmp['submission_id'] = $value->id;
@@ -5876,17 +4596,14 @@ exit;*/
         }
 
         $seconddata = array();
-        if(str_contains(request()->url(), '/export'))
-        {
+        if (str_contains(request()->url(), '/export')) {
             return $this->exportSubmissions($firstdata, $seconddata, $subjects, $terms);
-        }
-        else
-        {            
-            return view("Reports::missing_grade",compact("firstdata", "seconddata", "subjects", "terms", "programs", "program_id", 'enrollment_id','enrollment'));
+        } else {
+            return view("Reports::missing_grade", compact("firstdata", "seconddata", "subjects", "terms", "programs", "program_id", 'enrollment_id', 'enrollment'));
         }
     }
 
-    public function mcpssSubmissions($enrollment_id=0)
+    public function mcpssSubmissions($enrollment_id = 0)
     {
         $display_outcome = SubmissionsStatusUniqueLog::count();
 
@@ -5894,27 +4611,25 @@ exit;*/
 
         //$firstdata = Submissions::where("submissions.district_id", Session::get("district_id"))->where("mcp_employee", "Yes")->join("application", "application.id","submissions.application_id")->select("submissions.*")->where("application.enrollment_id", $enrollment_id)->get();
 
-        $firstdata=Submissions::
-                join('application','application.id','submissions.application_id')
-                ->join('enrollments','enrollments.id','application.enrollment_id')
-                ->where('submissions.district_id', Session::get('district_id'))
-                ->whereIn('submission_status', array('Active', 'Pending'))
-                ->where("mcp_employee", "Yes")
-                ->select('submissions.*','enrollments.school_year')
-                ->orderBy('created_at','desc')
-                ->get();
-        return view("Reports::mcpss_employee",compact("firstdata", "enrollment_id","enrollment","display_outcome"));
-    } 
+        $firstdata = Submissions::join('application', 'application.id', 'submissions.application_id')
+            ->join('enrollments', 'enrollments.id', 'application.enrollment_id')
+            ->where('submissions.district_id', Session::get('district_id'))
+            ->whereIn('submission_status', array('Active', 'Pending'))
+            ->where("mcp_employee", "Yes")
+            ->select('submissions.*', 'enrollments.school_year')
+            ->orderBy('created_at', 'desc')
+            ->get();
+        return view("Reports::mcpss_employee", compact("firstdata", "enrollment_id", "enrollment", "display_outcome"));
+    }
 
     /* Missing CDI Report */
-     public function missingCDIMain($enrollment_id, $late_submission=0)
+    public function missingCDIMain($enrollment_id, $late_submission = 0)
     {
         $enrollment = Enrollment::where("district_id", Session::get('district_id'))->get();
         $display_outcome = SubmissionsStatusUniqueLog::count();
-        return view("Reports::missing_cdi",compact('enrollment_id','enrollment','display_outcome','late_submission'));
-
+        return view("Reports::missing_cdi", compact('enrollment_id', 'enrollment', 'display_outcome', 'late_submission'));
     }
-    public function missingCDI($enrollment_id=0, $late_submission=0)
+    public function missingCDI($enrollment_id = 0, $late_submission = 0)
     {
         $enrollment = Enrollment::where("district_id", Session::get('district_id'))->get();
         $program_id = 0;
@@ -5936,38 +4651,29 @@ exit;*/
         $setEligibilityData = $availableGrades = array();
         $setEligibilityData = array();
 
-        if($late_submission == 1)
+        if ($late_submission == 1)
             $late = "Y";
         else
             $late = "N";
-        if(is_string($enrollment_id) && $enrollment_id == "Non-Current")
-        {
+        if (is_string($enrollment_id) && $enrollment_id == "Non-Current") {
 
-            $submissions=Submissions::where('submissions.district_id', (Session::get('district_id')!=0 ? Session::get('district_id') : 3))->where('cdi_override', 'N')->whereIn('submission_status', array("Active","Pending"))->whereNull('student_id')->get();
-        }
-        else if(is_string($enrollment_id) && $enrollment_id == "Current")
-        {
-            $submissions=Submissions::where('submissions.district_id', (Session::get('district_id')!=0 ? Session::get('district_id') : 3))->where('cdi_override', 'N')->whereIn('submission_status', array("Active","Pending"))->whereNotNull('student_id')->get();
-        }
-        else
-        {
-            $submissions=Submissions::where('submissions.district_id', (Session::get('district_id')!=0 ? Session::get('district_id') : 3))->whereIn('submission_status', array("Active","Pending"))->where('cdi_override', 'N')->get();
+            $submissions = Submissions::where('submissions.district_id', (Session::get('district_id') != 0 ? Session::get('district_id') : 3))->where('cdi_override', 'N')->whereIn('submission_status', array("Active", "Pending"))->whereNull('student_id')->get();
+        } else if (is_string($enrollment_id) && $enrollment_id == "Current") {
+            $submissions = Submissions::where('submissions.district_id', (Session::get('district_id') != 0 ? Session::get('district_id') : 3))->where('cdi_override', 'N')->whereIn('submission_status', array("Active", "Pending"))->whereNotNull('student_id')->get();
+        } else {
+            $submissions = Submissions::where('submissions.district_id', (Session::get('district_id') != 0 ? Session::get('district_id') : 3))->whereIn('submission_status', array("Active", "Pending"))->where('cdi_override', 'N')->get();
         }
 
-     
-        foreach($submissions as $value)
-        {
-           $eligibilityData = getEligibilitiesByProgram($value->first_choice_program_id, 'Conduct Disciplinary Info');
-            if(count($eligibilityData) > 0)
-            {
-                $availableGrades = array_merge(explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by), $availableGrades); 
+
+        foreach ($submissions as $value) {
+            $eligibilityData = getEligibilitiesByProgram($value->first_choice_program_id, 'Conduct Disciplinary Info');
+            if (count($eligibilityData) > 0) {
+                $availableGrades = array_merge(explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by), $availableGrades);
             }
-            if($value->second_choice_program_id > 0)
-            {
+            if ($value->second_choice_program_id > 0) {
                 $eligibilityData = getEligibilitiesByProgram($value->second_choice_program_id, 'Conduct Disciplinary Info');
-                if(count($eligibilityData) > 0)
-                {
-                    $availableGrades = array_merge(explode(",",$eligibilityData[0]->grade_lavel_or_recommendation_by), $availableGrades); 
+                if (count($eligibilityData) > 0) {
+                    $availableGrades = array_merge(explode(",", $eligibilityData[0]->grade_lavel_or_recommendation_by), $availableGrades);
                 }
             }
         }
@@ -5975,19 +4681,15 @@ exit;*/
 
         /* Get CDI Data */
 
-        
-        foreach($submissions as $key=>$value)
-        {
-            if(in_array($value->next_grade, $availableGrades))
-           {            
-               $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-                if(empty($cdi_data))
-                {
+
+        foreach ($submissions as $key => $value) {
+            if (in_array($value->next_grade, $availableGrades)) {
+                $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
+                if (empty($cdi_data)) {
                     $cdiArr = array();
 
                     $data = DB::table("student_conduct_disciplinary")->where("stateID", $value->student_id)->where('stateID', '<>', '')->first();
-                    if(!empty($data))
-                    {
+                    if (!empty($data)) {
                         $cdi_data = [
                             'submission_id' => $value->id,
                             'b_info' => $data->b_info,
@@ -5998,9 +4700,7 @@ exit;*/
                             'susp_days' => $data->susp_days
                         ];
                         DB::table("submission_conduct_discplinary_info")->insert($cdi_data);
-                    }
-                    else
-                    {
+                    } else {
                         $cdiArr['b_info'] = $cdiArr['c_info'] = $cdiArr['d_info'] = $cdi_data['d_info'] = $cdiArr['e_info'] = $cdiArr['susp'] = $cdiArr['susp_days'] = '<i class="fas fa-exclamation-circle text-danger"></i>';
                         $tmp = $this->convertToArray($value);
                         $tmp['submission_id'] = $value->id;
@@ -6012,25 +4712,22 @@ exit;*/
                         $firstdata[] = $tmp;
                     }
                 }
-            }           
+            }
         }
         $seconddata = $programs = array();
 
 
-        if(str_contains(request()->url(), '/export/missingcdi'))
-        {
+        if (str_contains(request()->url(), '/export/missingcdi')) {
             return $this->exportMissingCDI($firstdata);
-        }
-        else
-        {
+        } else {
             $display_outcome = SubmissionsStatusUniqueLog::count();
-            $returnHTML =  view("Reports::missing_cdi_response",compact("firstdata", "seconddata", "subjects", "terms", "programs", "program_id", "enrollment_id", "enrollment", "display_outcome", "late_submission"))->render();
-            return response()->json(array('success' => true, 'html'=>$returnHTML));         
+            $returnHTML =  view("Reports::missing_cdi_response", compact("firstdata", "seconddata", "subjects", "terms", "programs", "program_id", "enrollment_id", "enrollment", "display_outcome", "late_submission"))->render();
+            return response()->json(array('success' => true, 'html' => $returnHTML));
         }
     }
 
 
-    public function collectionStudentGrade($submission_id, $subjects, $terms, $type="", $next_grade=0)
+    public function collectionStudentGrade($submission_id, $subjects, $terms, $type = "", $next_grade = 0)
     {
 
         $config_subjects = Config::get('variables.subjects');
@@ -6047,65 +4744,47 @@ exit;*/
             $gd = $next_grade-2;
             */
         $sub = Submissions::where("id", $submission_id)->first();
-        if($sub->late_submission == "Y")
+        if ($sub->late_submission == "Y")
             $yr = "2020-2021";
         else
             $yr = "2019-2020";
         $gradeInfo = SubjectManagement::where("grade", $next_grade)->first();
 
-        foreach($subjects as $value)
-        {
-            foreach($terms as $value1)
-            {
+        foreach ($subjects as $value) {
+            foreach ($terms as $value1) {
                 $marks = getSubmissionAcademicScore($submission_id, $config_subjects[$value], $value1, $yr, $yr);
-               // echo $submission_id." - ".$config_subjects[$value] . " - ".$value1." - ".$marks . " - " .$yr."<br>";
-                if($type=="missing")
-                {
-                    if($marks == 0)
-                    {
-                        if(!empty($gradeInfo))
-                        {
-                            $field = strtolower(str_replace(" ","_", $config_subjects[$value]));    
-                            if($gradeInfo->{$field} == "N")
-                            {
-                                $score[$value][$value1] = "NA"; 
-                            }
-                            else
-                            {
+                // echo $submission_id." - ".$config_subjects[$value] . " - ".$value1." - ".$marks . " - " .$yr."<br>";
+                if ($type == "missing") {
+                    if ($marks == 0) {
+                        if (!empty($gradeInfo)) {
+                            $field = strtolower(str_replace(" ", "_", $config_subjects[$value]));
+                            if ($gradeInfo->{$field} == "N") {
+                                $score[$value][$value1] = "NA";
+                            } else {
                                 $score[$value][$value1] = '<i class="fas fa-exclamation-circle text-danger"></i>';
                                 $missing = true;
                             }
-
-                        }
-                        else
-                        {
+                        } else {
                             $score[$value][$value1] = '<i class="fas fa-exclamation-circle text-danger"></i>';
                             $missing = true;
                         }
-                    }
-                    else
-                        $score[$value][$value1] = $marks; 
-                }
-                else
-                    $score[$value][$value1] = $marks; 
-
+                    } else
+                        $score[$value][$value1] = $marks;
+                } else
+                    $score[$value][$value1] = $marks;
             }
         }
-        if($type == "missing")
-        {
-            if($missing == true)
-            {
+        if ($type == "missing") {
+            if ($missing == true) {
                 return $score;
-            }
-            else
+            } else
                 return array();
-        }
-        else
+        } else
             return $score;
     }
 
 
-    public function collectionStudentGradeReport($submission, $subjects, $terms, $next_grade=0, $skip=false, $setEligibilityData)
+    public function collectionStudentGradeReport($submission, $subjects, $terms, $next_grade = 0, $skip = false, $setEligibilityData)
     {
         $config_subjects = Config::get('variables.subjects');
         $score = array();
@@ -6123,11 +4802,9 @@ exit;*/
         $gradeInfo = SubjectManagement::where("grade", $next_grade)->first();
         $import_academic_year = Config::get('variables.import_academic_year');
         $first_failed = $second_failed = 0;
-        foreach($subjects as $value)
-        {
-            foreach($terms as $value1)
-            {
-                if($submission->late_submission == "Y")
+        foreach ($subjects as $value) {
+            foreach ($terms as $value1) {
+                if ($submission->late_submission == "Y")
                     $import_academic_year = "2020-2021";
                 else
                     $import_academic_year = "2019-2020";
@@ -6136,80 +4813,56 @@ exit;*/
 
                 /* Here copy above function if condition  for NA */
 
-                if($marks == "NA")
-                {
-                    if($skip || $submission->grade_override == "Y")
-                    {
+                if ($marks == "NA") {
+                    if ($skip || $submission->grade_override == "Y") {
                         $score[$value][$value1] = "NA";
-                    }
-                    else
-                    {
-                        if(!empty($gradeInfo))
-                        {
-                            $field = strtolower(str_replace(" ","_", $config_subjects[$value]));    
-                            if($gradeInfo->{$field} == "N")
-                            {
-                                $score[$value][$value1] = "NA"; 
-                            }
-                            else
-                            {
+                    } else {
+                        if (!empty($gradeInfo)) {
+                            $field = strtolower(str_replace(" ", "_", $config_subjects[$value]));
+                            if ($gradeInfo->{$field} == "N") {
+                                $score[$value][$value1] = "NA";
+                            } else {
                                 return array();
                             }
-
-                        }
-                        else
-                        {
+                        } else {
                             return array();
                         }
                     }
-                }
-                else
-                {
-                    if(isset($setEligibilityData[$submission->first_choice][$value."-".$value1]))
-                    {
-                        if($setEligibilityData[$submission->first_choice][$value."-".$value1] > $marks)
-                        {
+                } else {
+                    if (isset($setEligibilityData[$submission->first_choice][$value . "-" . $value1])) {
+                        if ($setEligibilityData[$submission->first_choice][$value . "-" . $value1] > $marks) {
                             $first_failed++;
                         }
                     }
 
-                    if(isset($setEligibilityData[$submission->second_choice][$value."-".$value1]))
-                    {
-                        if($setEligibilityData[$submission->second_choice][$value."-".$value1] > $marks)
-                        {
+                    if (isset($setEligibilityData[$submission->second_choice][$value . "-" . $value1])) {
+                        if ($setEligibilityData[$submission->second_choice][$value . "-" . $value1] > $marks) {
                             $second_failed++;
                         }
                     }
                     $score[$value][$value1] = $marks;
-
                 }
             }
         }
 
-        if($first_failed > 0 && $submission->grade_override == "N")
-        {
+        if ($first_failed > 0 && $submission->grade_override == "N") {
             $this->eligibility_grade_pass[$submission->id]['first'] = "Fail";
-        }
-        else
-        {
+        } else {
             $this->eligibility_grade_pass[$submission->id]['first'] = "Pass";
         }
 
-        if($second_failed > 0 && $submission->grade_override == "N")
-        {
+        if ($second_failed > 0 && $submission->grade_override == "N") {
             $this->eligibility_grade_pass[$submission->id]['second'] = "Fail";
-        }
-        else
-        {
+        } else {
             $this->eligibility_grade_pass[$submission->id]['second'] = "Pass";
         }
-                      
+
 
         return $score;
     }
 
 
-    public function collectionStudentGradeReportLateSubmission($submission, $subjects, $terms, $next_grade=0, $skip=false, $setEligibilityData)
+    public function collectionStudentGradeReportLateSubmission($submission, $subjects, $terms, $next_grade = 0, $skip = false, $setEligibilityData)
     {
         $config_subjects = Config::get('variables.subjects');
         $score = array();
@@ -6227,114 +4880,79 @@ exit;*/
         $gradeInfo = SubjectManagement::where("grade", $next_grade)->first();
         $import_academic_year = Config::get('variables.import_academic_year');
         $first_failed = $second_failed = 0;
-        foreach($subjects as $value)
-        {
+        foreach ($subjects as $value) {
             $avgcnt = $avgmarks = 0;
             $str = "";
             $na = false;
-            foreach($terms as $value1)
-            {
+            foreach ($terms as $value1) {
                 $tt = explode("-", $value1);
-                 foreach($tt as $tv)
-                 {
-                    if($tv != "Q4.4 Final Grade")
-                    {
+                foreach ($tt as $tv) {
+                    if ($tv != "Q4.4 Final Grade") {
                         $marks = getSubmissionAcademicScoreMissing($submission->id, $config_subjects[$value], $tv, "2020-2021", "2020-2021");
                         //echo $submission->id."-".$config_subjects[$value]." - ".$tv."-".$marks."<BR>";exit;
                         /* Here copy above function if condition  for NA */
-                        $str .= $tv."-";
-                        if($marks == "NA")
-                        {
-                            if($skip || $submission->grade_override == "Y")
-                            {
+                        $str .= $tv . "-";
+                        if ($marks == "NA") {
+                            if ($skip || $submission->grade_override == "Y") {
                                 $score[$value][$tv] = "NA";
                                 $na = true;
-                            }
-                            else
-                            {
-                                if(!empty($gradeInfo))
-                                {
-                                    $field = strtolower(str_replace(" ","_", $config_subjects[$value]));    
-                                    if($gradeInfo->{$field} == "N")
-                                    {
-                                        $score[$value][$tv] = "NA"; 
+                            } else {
+                                if (!empty($gradeInfo)) {
+                                    $field = strtolower(str_replace(" ", "_", $config_subjects[$value]));
+                                    if ($gradeInfo->{$field} == "N") {
+                                        $score[$value][$tv] = "NA";
                                         $na = true;
-                                    }
-                                    else
-                                    {
+                                    } else {
                                         return array();
                                     }
-
-                                }
-                                else
-                                {
+                                } else {
                                     return array();
                                 }
                             }
-                        }
-                        else
-                        {
+                        } else {
                             $avgmarks += $marks;
-                            
-
-                        }  
-                        $avgcnt++;                      
+                        }
+                        $avgcnt++;
                     }
-
-
-                 }  
+                }
             }
-            
-            if($avgcnt > 0 && !$na)    
-            {
-                $marks = number_format($avgmarks/$avgcnt, 2); 
-            }
-            elseif(!$na)
-            {
+
+            if ($avgcnt > 0 && !$na) {
+                $marks = number_format($avgmarks / $avgcnt, 2);
+            } elseif (!$na) {
                 $marks = 0;
             }
             $str = trim($str, "-");
 
 
 
-            if(isset($setEligibilityData[$submission->first_choice][$value."-".str_replace(" Qtr Grade", "", $str)]))
-            {
-                if($marks != "NA" && $marks > 0 && $setEligibilityData[$submission->first_choice][$value."-".str_replace(" Qtr Grade", "", $str)] > $marks)
-                {
+            if (isset($setEligibilityData[$submission->first_choice][$value . "-" . str_replace(" Qtr Grade", "", $str)])) {
+                if ($marks != "NA" && $marks > 0 && $setEligibilityData[$submission->first_choice][$value . "-" . str_replace(" Qtr Grade", "", $str)] > $marks) {
                     //echo $marks . " - ".($value."-".str_replace(" Qtr Grade", "", $str));exit;
                     $first_failed++;
                 }
             }
 
-            if(isset($setEligibilityData[$submission->second_choice][$value."-".str_replace(" Qtr Grade", "", $str)]))
-            {
-                if($marks != "NA" && $marks > 0 && $setEligibilityData[$submission->second_choice][$value."-".str_replace(" Qtr Grade", "", $str)] > $marks)
-                {
+            if (isset($setEligibilityData[$submission->second_choice][$value . "-" . str_replace(" Qtr Grade", "", $str)])) {
+                if ($marks != "NA" && $marks > 0 && $setEligibilityData[$submission->second_choice][$value . "-" . str_replace(" Qtr Grade", "", $str)] > $marks) {
                     $second_failed++;
                 }
             }
 
 
             $score[$value][$str] = $marks;
-
         }
 
 
-        if($first_failed > 0 && $submission->grade_override == "N")
-        {
+        if ($first_failed > 0 && $submission->grade_override == "N") {
             $this->eligibility_grade_pass[$submission->id]['first'] = "Fail";
-        }
-        else
-        {
+        } else {
             $this->eligibility_grade_pass[$submission->id]['first'] = "Pass";
         }
 
-        if($second_failed > 0 && $submission->grade_override == "N")
-        {
+        if ($second_failed > 0 && $submission->grade_override == "N") {
             $this->eligibility_grade_pass[$submission->id]['second'] = "Fail";
-        }
-        else
-        {
+        } else {
             $this->eligibility_grade_pass[$submission->id]['second'] = "Pass";
         }
 
@@ -6361,12 +4979,13 @@ exit;*/
         return $tmp;
     }
 
-    
+
     public function exportSubmissions($firstdata, $seconddata, $subjects, $terms)
     {
         $config_subjects = Config::get('variables.subjects');
         $data_ary = [];
-        $heading = array("Submission ID",
+        $heading = array(
+            "Submission ID",
             "Submission Status",
             "Race",
             "State ID",
@@ -6378,12 +4997,11 @@ exit;*/
             "First Choice",
             "Second Choice",
             "Sibling ID",
-            "Lottery Number");
-        foreach($subjects as $sbjct)
-        {
-            foreach($terms as $term)
-            {
-                $heading[] = $config_subjects[$sbjct]." ".$term;
+            "Lottery Number"
+        );
+        foreach ($subjects as $sbjct) {
+            foreach ($terms as $term) {
+                $heading[] = $config_subjects[$sbjct] . " " . $term;
             }
         }
         $heading[] = "B Info";
@@ -6410,31 +5028,26 @@ exit;*/
             $tmp[] = $value['second_program'];
             $tmp[] = $value['first_sibling'];
             $tmp[] = $value['lottery_number'];
-            
-            foreach($value['score'] as $skey=>$sbjct)
-            {
-                foreach($terms as $term)
-                {
-                    if(isset($sbjct[$term]))
-                    {
+
+            foreach ($value['score'] as $skey => $sbjct) {
+                foreach ($terms as $term) {
+                    if (isset($sbjct[$term])) {
                         $tmp[] = $sbjct[$term];
-                    }
-                    else
+                    } else
                         $tmp[] = "";
                 }
             }
-            foreach($value['cdi'] as $vkey=>$vcdi)
-            {
-                $tmp[] = ($value['cdi'][$vkey]==0 ? "0" : $value['cdi'][$vkey]);
+            foreach ($value['cdi'] as $vkey => $vcdi) {
+                $tmp[] = ($value['cdi'][$vkey] == 0 ? "0" : $value['cdi'][$vkey]);
             }
-            if($value['first_sibling'] != "" && $value['lottery_number'] != "")
-                $tmp [] = 1;
+            if ($value['first_sibling'] != "" && $value['lottery_number'] != "")
+                $tmp[] = 1;
             else
                 $tmp[] = 2;
             $data_ary[] = $tmp;
         }
 
-         foreach ($seconddata as $key => $value) {
+        foreach ($seconddata as $key => $value) {
             $tmp = array();
             $tmp[] = $value['id'];
             $tmp[] = $value['submission_status'];
@@ -6449,25 +5062,19 @@ exit;*/
             $tmp[] = $value['second_program'];
             $tmp[] = $value['first_sibling'];
             $tmp[] = $value['lottery_number'];
-            foreach($value['score'] as $skey=>$sbjct)
-            {
-                foreach($terms as $term)
-                {
-                    if(isset($sbjct[$term]))
-                    {
+            foreach ($value['score'] as $skey => $sbjct) {
+                foreach ($terms as $term) {
+                    if (isset($sbjct[$term])) {
                         $tmp[] = $sbjct[$term];
-                    }
-                    else
+                    } else
                         $tmp[] = "";
                 }
             }
-            foreach($value['cdi'] as $vkey=>$vcdi)
-            {
-                $tmp[] = ($value['cdi'][$vkey]==0 ? "0" : $value['cdi'][$vkey]);
-
+            foreach ($value['cdi'] as $vkey => $vcdi) {
+                $tmp[] = ($value['cdi'][$vkey] == 0 ? "0" : $value['cdi'][$vkey]);
             }
-            if($value['second_sibling'] != "" && $value['lottery_number'] != "")
-                $tmp [] = 1;
+            if ($value['second_sibling'] != "" && $value['lottery_number'] != "")
+                $tmp[] = 1;
             else
                 $tmp[] = 2;
 
@@ -6476,7 +5083,7 @@ exit;*/
 
         ob_end_clean();
         ob_start();
-        
+
         return Excel::download(new SubmissionExport(collect($data_ary)), 'Submissions.xlsx');
     }
 
@@ -6484,7 +5091,8 @@ exit;*/
     {
         $config_subjects = Config::get('variables.subjects');
         $data_ary = [];
-        $heading = array("Submission ID",
+        $heading = array(
+            "Submission ID",
             "Submission Status",
             "State ID",
             "Last Name",
@@ -6492,19 +5100,18 @@ exit;*/
             "Next Grade",
             "Current School",
             "First Choice",
-            "Second Choice");
-        foreach($subjects as $sbjct)
-        {
-            foreach($terms as $term)
-            {
-                $heading[] = $config_subjects[$sbjct]." ".$term;
+            "Second Choice"
+        );
+        foreach ($subjects as $sbjct) {
+            foreach ($terms as $term) {
+                $heading[] = $config_subjects[$sbjct] . " " . $term;
             }
         }
         $heading[] = "Current Grade";
         $data_ary[] = $heading;
 
         foreach ($firstdata as $key => $value) {
-           // print_r($value['score']);exit;
+            // print_r($value['score']);exit;
             $gradeInfo = SubjectManagement::where("grade", $value['next_grade'])->first();
 
             $tmp = array();
@@ -6517,23 +5124,16 @@ exit;*/
             $tmp[] = $value['current_school'];
             $tmp[] = $value['first_program'];
             $tmp[] = $value['second_program'];
-            foreach($value['score'] as $skey=>$sbjct)
-            {
-                foreach($terms as $term)
-                {
-                    $field = strtolower(str_replace(" ","_", $config_subjects[$skey]));    
-                            
-                    if(isset($sbjct[$term]) && is_numeric($sbjct[$term]))
-                    {
+            foreach ($value['score'] as $skey => $sbjct) {
+                foreach ($terms as $term) {
+                    $field = strtolower(str_replace(" ", "_", $config_subjects[$skey]));
+
+                    if (isset($sbjct[$term]) && is_numeric($sbjct[$term])) {
                         $tmp[] = $sbjct[$term];
-                    }
-                    elseif($gradeInfo->{$field} == "N")
-                    {
+                    } elseif ($gradeInfo->{$field} == "N") {
                         $tmp[] = "NA";
-                    }
-                    else{
+                    } else {
                         $tmp[] = "0";
-                    
                     }
                 }
             }
@@ -6549,7 +5149,8 @@ exit;*/
     public function exportMissingCDI($firstdata)
     {
         $data_ary = [];
-        $heading = array("Submission ID",
+        $heading = array(
+            "Submission ID",
             "Submission Status",
             "State ID",
             "Last Name",
@@ -6564,7 +5165,8 @@ exit;*/
             "E Info",
             "Susp",
             "#Days of Suspension",
-            "Current Grade");
+            "Current Grade"
+        );
         $data_ary[] = $heading;
 
         foreach ($firstdata as $key => $value) {
@@ -6578,15 +5180,11 @@ exit;*/
             $tmp[] = $value['current_school'];
             $tmp[] = $value['first_program'];
             $tmp[] = $value['second_program'];
-            foreach($value['cdi'] as $skey=>$sbjct)
-            {
-                    if(isset($value['cdi'][$skey]) && is_numeric($value['cdi'][$skey]))
-                    {
-                        $tmp[] = $value['cdi'][$skey];
-                    }
-                    else
-                        $tmp[] = "";
-                
+            foreach ($value['cdi'] as $skey => $sbjct) {
+                if (isset($value['cdi'][$skey]) && is_numeric($value['cdi'][$skey])) {
+                    $tmp[] = $value['cdi'][$skey];
+                } else
+                    $tmp[] = "";
             }
             $tmp[] = $value['current_grade'];
             $data_ary[] = $tmp;
@@ -6597,38 +5195,36 @@ exit;*/
         return Excel::download(new MissingCDIExport(collect($data_ary)), 'MissingCDI.xlsx');
     }
 
-    public function downloadTemplate(Request $request){
-        $filename='Submissions.xlsx';
-        return Excel::download(new DownloadTemplate(),$filename);
-        
+    public function downloadTemplate(Request $request)
+    {
+        $filename = 'Submissions.xlsx';
+        return Excel::download(new DownloadTemplate(), $filename);
     }
 
     public function importGrade(Request $request)
     {
         $rules = [
             // 'upload_csv'=>'required',
-            'upload_csv'=>'required|mimes:xlsx',
+            'upload_csv' => 'required|mimes:xlsx',
         ];
         $message = [
             // 'upload_csv.required'=>'File is required',
-            'upload_csv.required'=>'File is required',
-            'upload_csv.mimes'=>'Invalid file format | File format must be xlsx.',
+            'upload_csv.required' => 'File is required',
+            'upload_csv.mimes' => 'Invalid file format | File format must be xlsx.',
         ];
 
         $import = new GradeImport;
         $validator = Validator::make($request->all(), $rules, $message);
-        if($validator->fails()){
-            Session::flash('error','Please select proper file');
+        if ($validator->fails()) {
+            Session::flash('error', 'Please select proper file');
             return redirect()->back()->withErrors($validator)->withInput();
-        }else
-        {
+        } else {
             $file = $request->file('upload_csv');
             $headings = (new HeadingRowImport)->toArray($file);
-            
+
             $headRow = array();
             $tmp = array();
-            foreach($headings[0][0] as $key=>$value)
-            {
+            foreach ($headings[0][0] as $key => $value) {
                 $value = str_replace("_", " ", $value);
                 $value = str_replace(array_keys($import->termArr), array_values($import->termArr), $value);
                 $tmp[] = ucwords($value);
@@ -6642,18 +5238,17 @@ exit;*/
             $grade_array[] = $headRow;
             foreach ($import->invalidArr as $key => $data) {
 
-                    $tmp = $data;
-                    $tmp['Error'] = "Invalid Value";
-                    $grade_array[] = $tmp;
-                }
-                if(count($import->invalidArr) > 0)
-                {
-                        return Excel::download(new MissingGradesExport(collect($grade_array)),'GradeError.xlsx');
-                    }
-                
-            Session::flash('success','Grade Imported successfully');
+                $tmp = $data;
+                $tmp['Error'] = "Invalid Value";
+                $grade_array[] = $tmp;
+            }
+            if (count($import->invalidArr) > 0) {
+                return Excel::download(new MissingGradesExport(collect($grade_array)), 'GradeError.xlsx');
+            }
+
+            Session::flash('success', 'Grade Imported successfully');
         }
-        return  redirect()->back(); 
+        return  redirect()->back();
     }
 
     public function importGradeGet($enrollment_id)
@@ -6665,39 +5260,34 @@ exit;*/
     {
         $rules = [
             // 'upload_csv'=>'required',
-            'upload_csv'=>'required|mimes:xlsx',
+            'upload_csv' => 'required|mimes:xlsx',
         ];
         $message = [
             // 'upload_csv.required'=>'File is required',
-            'upload_csv.required'=>'File is required',
-            'upload_csv.mimes'=>'Invalid file format | File format must be xlsx.',
+            'upload_csv.required' => 'File is required',
+            'upload_csv.mimes' => 'Invalid file format | File format must be xlsx.',
         ];
 
         $validator = Validator::make($request->all(), $rules, $message);
-        if($validator->fails()){
-            Session::flash('error','Please select proper file');
+        if ($validator->fails()) {
+            Session::flash('error', 'Please select proper file');
             return redirect()->back()->withErrors($validator)->withInput();
-        }else
-        {
+        } else {
             $file = $request->file('upload_csv');
             $import = new CDIImport;
             $import->import($file);
 
             $headings = (new HeadingRowImport)->toArray($file);
-                    
+
             $headRow = array();
             $tmp = array();
-            foreach($headings[0][0] as $key=>$value)
-            {
-                if($value != "")
-                {
-                    if($value == "days_of_suspension")
+            foreach ($headings[0][0] as $key => $value) {
+                if ($value != "") {
+                    if ($value == "days_of_suspension")
                         $tmp[] = "#Days of Suspension";
-                    else
-                    {
+                    else {
                         $value = str_replace("_", " ", $value);
                         $tmp[] = ucwords($value);
-
                     }
                 }
             }
@@ -6711,14 +5301,12 @@ exit;*/
                 $tmp['Error'] = "Invalid Value";
                 $cdi_array[] = $tmp;
             }
-            if(count($import->invalidArr) > 0)
-            {
-                    return Excel::download(new MissingCDIExport(collect($cdi_array)),'CDIError.xlsx');
-                    
+            if (count($import->invalidArr) > 0) {
+                return Excel::download(new MissingCDIExport(collect($cdi_array)), 'CDIError.xlsx');
             }
-            Session::flash('success','CDI Imported successfully');
+            Session::flash('success', 'CDI Imported successfully');
         }
-        return  redirect()->back(); 
+        return  redirect()->back();
     }
 
     public function importCDIGet($enrollment_id)
@@ -6728,16 +5316,15 @@ exit;*/
 
     public function saveGrade(Request $request, $id)
     {
-    	$arr = array("1 1"=>"1.1", "1 2"=>"1.2","1 3"=>"1.3","1 4"=>"1.4","2 1"=>"2.1", "2 2"=>"2.2","2 3"=>"2.3","2 4"=>"2.4","3 1"=>"3.1", "3 2"=>"3.2","3 3"=>"3.3","3 4"=>"3.4","4 1"=>"4.1", "4 2"=>"4.2","4 3"=>"4.3","4 4"=>"4.4");
-    	$data = $request->all();
-    	$config_subjects = Config::get('variables.subjects');
-    	
-    	$courses = Config::get('variables.courseType');
+        $arr = array("1 1" => "1.1", "1 2" => "1.2", "1 3" => "1.3", "1 4" => "1.4", "2 1" => "2.1", "2 2" => "2.2", "2 3" => "2.3", "2 4" => "2.4", "3 1" => "3.1", "3 2" => "3.2", "3 3" => "3.3", "3 4" => "3.4", "4 1" => "4.1", "4 2" => "4.2", "4 3" => "4.3", "4 4" => "4.4");
+        $data = $request->all();
+        $config_subjects = Config::get('variables.subjects');
 
-        $submission_grade = SubmissionGrade::where("submission_id",$id)->join("submissions", "submissions.id", "submission_grade.submission_id")->join("application", "application.id", "submissions.application_id")->select("submission_grade.*", "submissions.application_id", "application.enrollment_id")->get();
+        $courses = Config::get('variables.courseType');
+
+        $submission_grade = SubmissionGrade::where("submission_id", $id)->join("submissions", "submissions.id", "submission_grade.submission_id")->join("application", "application.id", "submissions.application_id")->select("submission_grade.*", "submissions.application_id", "application.enrollment_id")->get();
         $current_grade = array();
-        foreach($submission_grade as $key=>$value)
-        {
+        foreach ($submission_grade as $key => $value) {
             $tmp = array();
             $tmp['submission_id'] = $value->submission_id;
             $tmp['application_id'] = $value->application_id;
@@ -6751,59 +5338,51 @@ exit;*/
             $current_grade[] = $tmp;
         }
 
-    	
+
         $new_grade = array();
-    	$grades_data = [];
+        $grades_data = [];
         $rs = Submissions::where("id", $id)->first();
 
-    	foreach($data as $key=>$value)
-    	{
-    		if($key != "_token")
-    		{
-    			$key = str_replace("id_".$id."_", "", $key);
-    			$insert = array();
-    			$insert['submission_id'] = $id;
-    			$tmp = explode("-", $key);
-    			$insert['courseType'] = $config_subjects[$tmp[0]];
-    			$insert['courseTypeID'] = findArrayKey($courses, $config_subjects[$tmp[0]]);
-    			$tmp1 = str_replace("_", " ", $tmp[1]);
-    			$insert['GradeName'] = str_replace(array_keys($arr), array_values($arr), $tmp1);
-    			$insert['courseFullName'] = $insert['courseType'];
-                if($rs->late_submission == "Y")
-                    $insert['academicYear'] = "2020-2021";//(date("Y")-1)."-".date("Y");
+        foreach ($data as $key => $value) {
+            if ($key != "_token") {
+                $key = str_replace("id_" . $id . "_", "", $key);
+                $insert = array();
+                $insert['submission_id'] = $id;
+                $tmp = explode("-", $key);
+                $insert['courseType'] = $config_subjects[$tmp[0]];
+                $insert['courseTypeID'] = findArrayKey($courses, $config_subjects[$tmp[0]]);
+                $tmp1 = str_replace("_", " ", $tmp[1]);
+                $insert['GradeName'] = str_replace(array_keys($arr), array_values($arr), $tmp1);
+                $insert['courseFullName'] = $insert['courseType'];
+                if ($rs->late_submission == "Y")
+                    $insert['academicYear'] = "2020-2021"; //(date("Y")-1)."-".date("Y");
                 else
-    			     $insert['academicYear'] = "2019-2020";//(date("Y")-1)."-".date("Y");
+                    $insert['academicYear'] = "2019-2020"; //(date("Y")-1)."-".date("Y");
                 $insert['academicTerm'] = $insert['GradeName'];
-    			$insert['stateID'] = $rs->student_id;
-    			$insert['numericGrade'] = $value;
+                $insert['stateID'] = $rs->student_id;
+                $insert['numericGrade'] = $value;
 
                 $exist = SubmissionGrade::where("submission_id", $id)->where("courseType", $config_subjects[$tmp[0]])->where('academicYear', $insert['academicYear'])->where('academicTerm', $insert['academicTerm'])->first();
-                if(!empty($exist))
-                {
+                if (!empty($exist)) {
 
                     $upd = SubmissionGrade::where("submission_id", $id)->where("courseType", $config_subjects[$tmp[0]])->where('academicYear', $insert['academicYear'])->where('academicTerm', $insert['academicTerm'])->update($insert);
-                }
-                else
-                {
+                } else {
                     $ins = SubmissionGrade::create($insert);
                 }
 
-                 $initSubmission = Submissions::where('submissions.id',$id)->join("application", "application.id", "submissions.application_id")->select("submissions.*", 'submissions.id as submission_id', "application.enrollment_id")->first();
+                $initSubmission = Submissions::where('submissions.id', $id)->join("application", "application.id", "submissions.application_id")->select("submissions.*", 'submissions.id as submission_id', "application.enrollment_id")->first();
                 $insert['enrollment_id'] = $initSubmission->enrollment_id;
                 $insert['application_id'] = $initSubmission->application_id;
                 $new_grade[] = $insert;
-
-    		}
-    	}
+            }
+        }
         $this->modelGradeChanges($current_grade, $new_grade, "Submission Academic Grade Report");
 
         $failed = $this->checkMissingGrades($id);
-        if($failed == 0 && $rs->submission_status == "Pending")
-        {
+        if ($failed == 0 && $rs->submission_status == "Pending") {
             $rs = SubmissionConductDisciplinaryInfo::where("submission_id", $id)->first();
-            if(!empty($rs))
-            {
-                Submissions::where("id", $id)->update(array("submission_status"=>"Active"));
+            if (!empty($rs)) {
+                Submissions::where("id", $id)->update(array("submission_status" => "Active"));
             }
         }
         echo "Succ";
@@ -6816,78 +5395,59 @@ exit;*/
         $subjects = $terms = $eligibilityArr = array();
         $eligibilityData = getEligibilitiesByProgram($submission->first_choice_program_id, 'Academic Grade Calculation');
 
-        if(count($eligibilityData) > 0)
-        {
-            if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-            {
+        if (count($eligibilityData) > 0) {
+            if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
                 $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-               // echo $eligibilityData[0]->id;exit;
+                // echo $eligibilityData[0]->id;exit;
                 $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
 
-                if(!empty($content))
-                {
-                    if($content->scoring->type=="DD")
-                    {
+                if (!empty($content)) {
+                    if ($content->scoring->type == "DD") {
                         $tmp = array();
-                        
-                        foreach($content->subjects as $svalue)
-                        {
-                            if(!in_array($svalue, $subjects))
-                            {
+
+                        foreach ($content->subjects as $svalue) {
+                            if (!in_array($svalue, $subjects)) {
                                 $subjects[] = $svalue;
                             }
                         }
 
-                        foreach($content->terms_calc as $tvalue)
-                        {
-                            if(!in_array($tvalue, $terms))
-                            {
+                        foreach ($content->terms_calc as $tvalue) {
+                            if (!in_array($tvalue, $terms)) {
                                 $terms[] = $tvalue;
                             }
                         }
                     }
-                }                        
+                }
             }
         }
 
-        if($submission->second_choice_program_id > 0)
-        {
+        if ($submission->second_choice_program_id > 0) {
             $eligibilityData = getEligibilitiesByProgram($submission->second_choice_program_id, 'Academic Grade Calculation');
-            if(count($eligibilityData) > 0)
-            {
-                if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                {
+            if (count($eligibilityData) > 0) {
+                if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
                     $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                   // echo $eligibilityData[0]->id;exit;
+                    // echo $eligibilityData[0]->id;exit;
                     $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
 
-                    if(!empty($content))
-                    {
-                        if($content->scoring->type=="DD")
-                        {
+                    if (!empty($content)) {
+                        if ($content->scoring->type == "DD") {
                             $tmp = array();
-                            
-                            foreach($content->subjects as $value)
-                            {
-                                if(!in_array($value, $subjects))
-                                {
+
+                            foreach ($content->subjects as $value) {
+                                if (!in_array($value, $subjects)) {
                                     $subjects[] = $value;
                                 }
                             }
 
-                            foreach($content->terms_calc as $value)
-                            {
-                                if(!in_array($value, $terms))
-                                {
+                            foreach ($content->terms_calc as $value) {
+                                if (!in_array($value, $terms)) {
                                     $terms[] = $value;
                                 }
                             }
                         }
-                    }                        
+                    }
                 }
-
             }
-
         }
 
         $config_subjects = Config::get('variables.subjects');
@@ -6898,28 +5458,20 @@ exit;*/
         $import_academic_year = Config::get('variables.import_academic_year');
         $first_failed = $second_failed = 0;
         $failed = 0;
-        foreach($subjects as $value)
-        {
-            foreach($terms as $value1)
-            {
-                
+        foreach ($subjects as $value) {
+            foreach ($terms as $value1) {
+
                 $marks = getSubmissionAcademicScoreMissing($submission->id, $config_subjects[$value], $value1, $import_academic_year, $import_academic_year);
                 /* Here copy above function if condition  for NA */
-                if($marks == "NA")
-                {
-                    if(!empty($gradeInfo))
-                    {
-                        $field = strtolower(str_replace(" ","_", $config_subjects[$value]));    
-                        echo $gradeInfo->{$field}."-";
-                        if($gradeInfo->{$field} == "Y")
-                        {
-                            echo " - ".$failed;
+                if ($marks == "NA") {
+                    if (!empty($gradeInfo)) {
+                        $field = strtolower(str_replace(" ", "_", $config_subjects[$value]));
+                        echo $gradeInfo->{$field} . "-";
+                        if ($gradeInfo->{$field} == "Y") {
+                            echo " - " . $failed;
                             $failed++;
                         }
-
-                    }
-                    else
-                    {
+                    } else {
                         $failed++;
                     }
                 }
@@ -6931,31 +5483,27 @@ exit;*/
     public function saveCDI(Request $request, $id)
     {
         $data = $request->all();
- 
+
         $rs = Submissions::where("id", $id)->first();
         $insert = array();
         $insert['submission_id'] = $id;
         $insert['stateID'] = $rs->student_id;
-        foreach($data as $key=>$value)
-        {
-            if($key != "_token")
-            {
-                $key = str_replace("id_".$id."_", "", $key);
+        foreach ($data as $key => $value) {
+            if ($key != "_token") {
+                $key = str_replace("id_" . $id . "_", "", $key);
                 $insert[$key] = $value;
-
             }
         }
         SubmissionConductDisciplinaryInfo::create($insert);
 
-        $app_data = SubmissionConductDisciplinaryInfo::where("submission_id",$id)->join("submissions", "submissions.id", "submission_conduct_discplinary_info.submission_id")->join("application", "application.id", "submissions.application_id")->select("submission_id", "b_info", "c_info", "d_info", "e_info", "susp", "susp_days",  "submissions.application_id", "application.enrollment_id", "submission.submissions_final_status")->first();
+        $app_data = SubmissionConductDisciplinaryInfo::where("submission_id", $id)->join("submissions", "submissions.id", "submission_conduct_discplinary_info.submission_id")->join("application", "application.id", "submissions.application_id")->select("submission_id", "b_info", "c_info", "d_info", "e_info", "susp", "susp_days",  "submissions.application_id", "application.enrollment_id", "submission.submissions_final_status")->first();
 
-//        print_r($app_data);exit;
-        $this->modelCDICreate($app_data,"Submission - CDI");
+        //        print_r($app_data);exit;
+        $this->modelCDICreate($app_data, "Submission - CDI");
 
         $failed = $this->checkMissingGrades($id);
-        if($failed == 0 && $app_data->submissions_final_status == "Pending")
-        {
-            Submissions::where("id", $id)->update(array("submission_status"=>"Active"));
+        if ($failed == 0 && $app_data->submissions_final_status == "Pending") {
+            Submissions::where("id", $id)->update(array("submission_status" => "Active"));
         }
 
         echo "Succ";
@@ -6963,37 +5511,36 @@ exit;*/
 
     public function mcpssEmployeeVerification($submission_id, $status)
     {
-        $data = Submissions::where('id',$submission_id)->first();
-        if(isset($data)){
-            Submissions::where('id',$submission_id)->update(['mcpss_verification_status'=>$status, 'mcpss_verification_status_by'=>Auth::user()->id, 'mcpss_verification_status_at'=> date("Y-m-d H:i:s")]);
+        $data = Submissions::where('id', $submission_id)->first();
+        if (isset($data)) {
+            Submissions::where('id', $submission_id)->update(['mcpss_verification_status' => $status, 'mcpss_verification_status_by' => Auth::user()->id, 'mcpss_verification_status_at' => date("Y-m-d H:i:s")]);
         }
-        Session::flash('success','Employee verification status changed successfully.');
+        Session::flash('success', 'Employee verification status changed successfully.');
         return redirect()->back();
     }
 
     public function mcpssEmployeeStatus($submission_id)
     {
-        $data = Submissions::where('id',$submission_id)->first();
-        if(isset($data)){
-            Submissions::where('id',$submission_id)->update(['magnet_program_employee'=>'Y', 'magnet_program_employee_by'=>Auth::user()->id, 'magnet_program_employee_at'=> date("Y-m-d H:i:s")]);
+        $data = Submissions::where('id', $submission_id)->first();
+        if (isset($data)) {
+            Submissions::where('id', $submission_id)->update(['magnet_program_employee' => 'Y', 'magnet_program_employee_by' => Auth::user()->id, 'magnet_program_employee_at' => date("Y-m-d H:i:s")]);
         }
-        Session::flash('success','Employee status changed successfully.');
+        Session::flash('success', 'Employee status changed successfully.');
         return redirect()->back();
     }
 
-    public function priorityCalculate($submission, $choice="first")
+    public function priorityCalculate($submission, $choice = "first")
     {
-        $str = $choice."_choice_program_id";
+        $str = $choice . "_choice_program_id";
         $rank_counter = 0;
-        if($submission->{$str} != 0 && $submission->{$str} != '')
-        {
+        if ($submission->{$str} != 0 && $submission->{$str} != '') {
             $priority_details = DB::table("priorities")->join("program", "program.priority", "priorities.id")->join("priority_details", "priority_details.priority_id", "priorities.id")->where("program.id", $submission->{$str})->select('priorities.*', 'priority_details.*', 'program.feeder_priorities', 'program.magnet_priorities')->get();
 
             foreach ($priority_details as $count => $priority) {
 
                 $flag = false;
-                if ($priority->sibling == 'Y'){
-                    if (isset($submission->{$choice.'_sibling'}) && $submission->{$choice.'_sibling'} != '') {
+                if ($priority->sibling == 'Y') {
+                    if (isset($submission->{$choice . '_sibling'}) && $submission->{$choice . '_sibling'} != '') {
                         $flag = true;
                     }
                     if ($flag == false) {
@@ -7003,9 +5550,9 @@ exit;*/
 
                 // Magnet Employee
                 $flag = false;
-                if ($priority->magnet_employee == 'Y'){
+                if ($priority->magnet_employee == 'Y') {
                     if (isset($submission->magnet_program_employee) && $submission->magnet_program_employee == 'Y') {
-                        $flag = true;   
+                        $flag = true;
                     }
                     if ($flag == false) {
                         continue;
@@ -7014,54 +5561,40 @@ exit;*/
 
                 // Feeder
                 $flag = false;
-                if ($priority->feeder == 'Y'){
-                    if($priority->feeder_priorities != '')
-                    {
+                if ($priority->feeder == 'Y') {
+                    if ($priority->feeder_priorities != '') {
                         $tmp = explode(",", $priority->feeder_priorities);
-                        
-                        if(in_array($submission->current_school, $tmp)) 
-                        {
+
+                        if (in_array($submission->current_school, $tmp)) {
                             $flag = true;
                         }
-                        if ($flag == false) 
-                        {
+                        if ($flag == false) {
                             continue;
                         }
-                    }
-                    else
-                    {
+                    } else {
                         continue;
                     }
+                }
 
-                 }
-
-                 // Magnet School
+                // Magnet School
                 $flag = false;
-                if ($priority->magnet_student == 'Y'){
-                    if($priority->magnet_priorities != '')
-                    {
+                if ($priority->magnet_student == 'Y') {
+                    if ($priority->magnet_priorities != '') {
                         $tmp = explode(",", $priority->magnet_priorities);
-                        if(in_array($submission->current_school, $tmp)) 
-                        {
+                        if (in_array($submission->current_school, $tmp)) {
                             $flag = true;
                         }
-                        if ($flag == false) 
-                        {
+                        if ($flag == false) {
                             continue;
                         }
-                    }
-                    else
-                    {
+                    } else {
                         continue;
                     }
-
-
-                 }
-                 return $count+1;
+                }
+                return $count + 1;
             }
 
             return 404;
-
         }
         return 404;
     }
@@ -7074,56 +5607,42 @@ exit;*/
 
     public function checkCDIStatus($setCDIEligibilityData, $cdiData, $id)
     {
-        if(isset($setCDIEligibilityData[$id]['b_info']))
-        {
-            if($cdiData['b_info'] == "NA")
-            {
+        if (isset($setCDIEligibilityData[$id]['b_info'])) {
+            if ($cdiData['b_info'] == "NA") {
                 return "Pass";
-            }
-            elseif($cdiData['b_info'] > $setCDIEligibilityData[$id]['b_info'] || $cdiData['c_info'] > $setCDIEligibilityData[$id]['c_info'] || $cdiData['d_info'] > $setCDIEligibilityData[$id]['d_info'] || $cdiData['e_info'] > $setCDIEligibilityData[$id]['e_info'] || $cdiData['susp'] > $setCDIEligibilityData[$id]['susp'] || $cdiData['susp_days'] > $setCDIEligibilityData[$id]['susp_days'])
-            {
+            } elseif ($cdiData['b_info'] > $setCDIEligibilityData[$id]['b_info'] || $cdiData['c_info'] > $setCDIEligibilityData[$id]['c_info'] || $cdiData['d_info'] > $setCDIEligibilityData[$id]['d_info'] || $cdiData['e_info'] > $setCDIEligibilityData[$id]['e_info'] || $cdiData['susp'] > $setCDIEligibilityData[$id]['susp'] || $cdiData['susp_days'] > $setCDIEligibilityData[$id]['susp_days']) {
                 return "Fail";
-            }
-            else
-            {
+            } else {
                 return "Pass";
             }
         }
     }
-    
 
-    public function offerStatus($enrollment_id=0, $type="", $version=0)
+
+    public function offerStatus($enrollment_id = 0, $type = "", $version = 0)
     {
         $enrollment = Enrollment::where("district_id", Session::get('district_id'))->get();
 
         $versions_lists = WaitlistProcessLogs::orderBy("created_at", "desc")->get();
         $late_lists = LateSubmissionProcessLogs::orderBy("created_at", "desc")->get();
 
-        if($version == 0)
-        {
-            $data_ary = SubmissionsFinalStatus::
-                join('submissions', 'submissions.id', 'submissions_final_status.submission_id')
-                ->where(function($query) {
+        if ($version == 0) {
+            $data_ary = SubmissionsFinalStatus::join('submissions', 'submissions.id', 'submissions_final_status.submission_id')
+                ->where(function ($query) {
                     $query->where('first_choice_final_status', 'Offered');
                     $query->orWhere('second_choice_final_status', 'Offered');
                 })
                 ->get();
-        }
-        elseif($type=="waitlist")
-        {
-            $data_ary = SubmissionsWaitlistFinalStatus::
-                join('submissions', 'submissions.id', 'submissions_waitlist_final_status.submission_id')
-                ->where(function($query) {
+        } elseif ($type == "waitlist") {
+            $data_ary = SubmissionsWaitlistFinalStatus::join('submissions', 'submissions.id', 'submissions_waitlist_final_status.submission_id')
+                ->where(function ($query) {
                     $query->where('first_choice_final_status', 'Offered');
                     $query->orWhere('second_choice_final_status', 'Offered');
                 })->where("submissions_waitlist_final_status.version", $version)
                 ->get();
-        }
-        elseif($type=="latesubmission")
-        {
-            $data_ary = LateSubmissionFinalStatus::
-                join('submissions', 'submissions.id', 'late_submissions_final_status.submission_id')
-                ->where(function($query) {
+        } elseif ($type == "latesubmission") {
+            $data_ary = LateSubmissionFinalStatus::join('submissions', 'submissions.id', 'late_submissions_final_status.submission_id')
+                ->where(function ($query) {
                     $query->where('first_choice_final_status', 'Offered');
                     $query->orWhere('second_choice_final_status', 'Offered');
                 })->where("late_submissions_final_status.version", $version)
@@ -7133,15 +5652,15 @@ exit;*/
 
 
 
-        return view("Reports::offer_status",compact("enrollment_id", "enrollment", "data_ary","versions_lists", "version", "late_lists", "type"));
+        return view("Reports::offer_status", compact("enrollment_id", "enrollment", "data_ary", "versions_lists", "version", "late_lists", "type"));
     }
 
     public function seatStatus($enrollment_id = 0)
     {
         $ids = array('"PreK"', '"K"', '"1"', '"2"', '"3"', '"4"', '"5"', '"6"', '"7"', '"8"', '"9"', '"10"', '"11"', '"12"');
-         $enrollment = Enrollment::where("district_id", Session::get('district_id'))->get();
+        $enrollment = Enrollment::where("district_id", Session::get('district_id'))->get();
         $district_id = Session::get("district_id");
-         $submissions = Submissions::where('district_id', $district_id)->orderByRaw('FIELD(next_grade,'.implode(",",$ids).')')
+        $submissions = Submissions::where('district_id', $district_id)->orderByRaw('FIELD(next_grade,' . implode(",", $ids) . ')')
             ->get(['first_choice_program_id', 'second_choice_program_id', 'next_grade']);
 
 
@@ -7150,8 +5669,7 @@ exit;*/
         if (isset($submissions)) {
             foreach ($choices as $choice) {
                 foreach ($submissions as $key => $value) {
-                    if($value->$choice != 0)
-                    {
+                    if ($value->$choice != 0) {
                         if (!isset($programs[$value->$choice])) {
                             $programs[$value->$choice] = [];
                         }
@@ -7165,107 +5683,103 @@ exit;*/
 
         ksort($programs);
         $final_data = array();
-        foreach($programs as $key=>$value)
-        {
-            foreach($value as $ikey=>$ivalue)
-            {
+        foreach ($programs as $key => $value) {
+            foreach ($value as $ikey => $ivalue) {
                 $tmp = array();
-                $tmp['program_name'] = getProgramName($key) ." - Grade ".$ivalue;
+                $tmp['program_name'] = getProgramName($key) . " - Grade " . $ivalue;
                 $rs = Availability::where("program_id", $key)->where("grade", $ivalue)->select("available_seats")->first();
                 $tmp['total_seats'] = $rs->available_seats;
-                $tmp['total_applicants'] = Submissions::where('district_id', $district_id)->where(function($query) use ($key){
+                $tmp['total_applicants'] = Submissions::where('district_id', $district_id)->where(function ($query) use ($key) {
                     $query->where('first_choice_program_id', $key);
                     $query->orWhere('second_choice_program_id', $key);
                 })->where('next_grade', $ivalue)->get()->count();
 
                 $rs1 = Submissions::where('district_id', $district_id)->where("first_choice_final_status", "Offered")
-                                  ->where("first_choice_program_id", $key)
-                                  ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where('next_grade',$ivalue)
-                            ->get()->count();
+                    ->where("first_choice_program_id", $key)
+                    ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+                    ->where('next_grade', $ivalue)
+                    ->get()->count();
                 $rs2 = Submissions::where('district_id', $district_id)->where("second_choice_final_status", "Offered")
-                                  ->where("second_choice_program_id", $key)
-                                  ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where('next_grade',$ivalue)
-                            ->get()->count();
+                    ->where("second_choice_program_id", $key)
+                    ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+                    ->where('next_grade', $ivalue)
+                    ->get()->count();
                 $tmp['offered'] = $rs1 + $rs2;
 
 
                 $rs1 = Submissions::where('district_id', $district_id)->where("first_choice_final_status", "Denied due to Ineligibility")
-                                  ->where("first_choice_program_id", $key)
-                                  ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where('next_grade',$ivalue)
-                            ->get()->count();
+                    ->where("first_choice_program_id", $key)
+                    ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+                    ->where('next_grade', $ivalue)
+                    ->get()->count();
                 $rs2 = Submissions::where('district_id', $district_id)->where("second_choice_final_status", "Denied due to Ineligibility")
-                                  ->where("second_choice_program_id", $key)
-                                  ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where('next_grade',$ivalue)
-                            ->get()->count();
+                    ->where("second_choice_program_id", $key)
+                    ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+                    ->where('next_grade', $ivalue)
+                    ->get()->count();
                 $tmp['noteligible'] = $rs1 + $rs2;
 
                 $rs1 = Submissions::where('district_id', $district_id)->where("first_choice_final_status", "Denied due To Incomplete Records")
-                                  ->where("first_choice_program_id", $key)
-                                  ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where('next_grade',$ivalue)
-                            ->get()->count();
+                    ->where("first_choice_program_id", $key)
+                    ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+                    ->where('next_grade', $ivalue)
+                    ->get()->count();
                 $rs2 = Submissions::where('district_id', $district_id)->where("second_choice_final_status", "Denied due To Incomplete Records")
-                                  ->where("second_choice_program_id", $key)
-                                  ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where('next_grade',$ivalue)
-                            ->get()->count();
+                    ->where("second_choice_program_id", $key)
+                    ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+                    ->where('next_grade', $ivalue)
+                    ->get()->count();
                 $tmp['Incomplete'] = $rs1 + $rs2;
 
                 $rs1 = Submissions::where('district_id', $district_id)->where("first_choice_final_status", "Offered")
-                                  ->where("first_choice_program_id", $key)
-                                  ->where("first_offer_status", 'Declined')
-                                  ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where('next_grade',$ivalue)
-                            ->get()->count();
+                    ->where("first_choice_program_id", $key)
+                    ->where("first_offer_status", 'Declined')
+                    ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+                    ->where('next_grade', $ivalue)
+                    ->get()->count();
                 $rs2 = Submissions::where('district_id', $district_id)->where("second_choice_final_status", "Offered")
-                                  ->where("second_choice_program_id", $key)
-                                  ->where("second_offer_status", 'Declined')
-                                  ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where('next_grade',$ivalue)
-                            ->get()->count();
+                    ->where("second_choice_program_id", $key)
+                    ->where("second_offer_status", 'Declined')
+                    ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+                    ->where('next_grade', $ivalue)
+                    ->get()->count();
                 $tmp['Decline'] = $rs1 + $rs2;
 
                 $rs1 = Submissions::where('district_id', $district_id)->where("first_choice_final_status", "Offered")
-                                  ->where("first_choice_program_id", $key)
-                                  ->where("first_offer_status", 'Declined & Waitlisted')
-                                  ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where('next_grade',$ivalue)
-                            ->get()->count();
+                    ->where("first_choice_program_id", $key)
+                    ->where("first_offer_status", 'Declined & Waitlisted')
+                    ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+                    ->where('next_grade', $ivalue)
+                    ->get()->count();
                 $rs2 = Submissions::where('district_id', $district_id)->where("second_choice_final_status", "Offered")
-                                  ->where("second_choice_program_id", $key)
-                                  ->where("second_offer_status", 'Declined & Waitlisted')
-                                  ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where('next_grade',$ivalue)
-                            ->get()->count();
+                    ->where("second_choice_program_id", $key)
+                    ->where("second_offer_status", 'Declined & Waitlisted')
+                    ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+                    ->where('next_grade', $ivalue)
+                    ->get()->count();
                 $tmp['Waitlisted'] = $rs1 + $rs2;
 
                 $rs1 = Submissions::where('district_id', $district_id)->where("first_choice_final_status", "Offered")
-                                  ->where("first_choice_program_id", $key)
-                                  ->where("first_offer_status", 'Accepted')
-                                  ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where('next_grade',$ivalue)
-                            ->get()->count();
+                    ->where("first_choice_program_id", $key)
+                    ->where("first_offer_status", 'Accepted')
+                    ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+                    ->where('next_grade', $ivalue)
+                    ->get()->count();
                 $rs2 = Submissions::where('district_id', $district_id)->where("second_choice_final_status", "Offered")
-                                  ->where("second_choice_program_id", $key)
-                                  ->where("second_offer_status", 'Accepted')
-                                  ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where('next_grade',$ivalue)
-                            ->get()->count();
+                    ->where("second_choice_program_id", $key)
+                    ->where("second_offer_status", 'Accepted')
+                    ->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+                    ->where('next_grade', $ivalue)
+                    ->get()->count();
                 $tmp['Accepted'] = $rs1 + $rs2;
 
                 $tmp['remaining'] = $tmp['total_seats'] - $tmp['Accepted'];
                 $final_data[] = $tmp;
-
             }
-
         }
 
         //print_r($final_data);exit;
-        return view("Reports::seats_status",compact("enrollment_id", "enrollment", "final_data"));
+        return view("Reports::seats_status", compact("enrollment_id", "enrollment", "final_data"));
     }
 
 
@@ -7292,66 +5806,53 @@ exit;*/
 
         }
         exit;*/
-        
+
         /* Get Next Grade Unique for Tabbing */
         $grade_data = Submissions::distinct()->where('next_grade', '<>', '')->orderBy('next_grade', 'DESC')->get(["next_grade"]);
-        $gradeArr = array("K","1","2","3","4","5","6","7","8","9","10","11","12");
+        $gradeArr = array("K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
         $fgradeTab = [];
-        foreach($grade_data as $key=>$value)
-        {
+        foreach ($grade_data as $key => $value) {
             $fgradeTab[] = $value->next_grade;
         }
         $gradeTab = [];
-        foreach($gradeArr as $key=>$value)
-        {
-            if(in_array($value, $fgradeTab))
+        foreach ($gradeArr as $key => $value) {
+            if (in_array($value, $fgradeTab))
                 $gradeTab[] = $value;
         }
         $firstData = Submissions::distinct()->whereIn("submission_status", array("Waitlisted", "Declined / Waitlist for other"))->get(["first_choice"]);
 
-         /* Get Subject and Acardemic Term like Q1.1 Q1.2 etc set for Academic Grade Calculation 
+        /* Get Subject and Acardemic Term like Q1.1 Q1.2 etc set for Academic Grade Calculation 
                 For all unique First Choice and Second Choice
          */
         $subjects = $terms = array();
         $eligibilityArr = array();
-        foreach($firstData as $value)
-        {
-            if($value->first_choice != "")
-            {
+        foreach ($firstData as $value) {
+            if ($value->first_choice != "") {
                 $eligibilityData = getEligibilities($value->first_choice, 'Academic Grade Calculation');
-                if(count($eligibilityData) > 0)
-                {
-                    if(!in_array($eligibilityData[0]->id, $eligibilityArr))
-                    {
+                if (count($eligibilityData) > 0) {
+                    if (!in_array($eligibilityData[0]->id, $eligibilityArr)) {
                         $eligibilityArr[] = $eligibilityData[0]->assigned_eigibility_name;
-                       // echo $eligibilityData[0]->id;exit;
+                        // echo $eligibilityData[0]->id;exit;
                         $content = getEligibilityContent1($eligibilityData[0]->assigned_eigibility_name);
 
-                        if(!empty($content))
-                        {
-                            if($content->scoring->type=="DD")
-                            {
+                        if (!empty($content)) {
+                            if ($content->scoring->type == "DD") {
                                 $tmp = array();
-                                
-                                foreach($content->subjects as $value)
-                                {
-                                    if(!in_array($value, $subjects))
-                                    {
+
+                                foreach ($content->subjects as $value) {
+                                    if (!in_array($value, $subjects)) {
                                         $subjects[] = $value;
                                     }
                                 }
 
-                                foreach($content->terms_calc as $value)
-                                {
-                                    if(!in_array($value, $terms))
-                                    {
+                                foreach ($content->terms_calc as $value) {
+                                    if (!in_array($value, $terms)) {
                                         $terms[] = $value;
                                     }
                                 }
                             }
-                        }                        
+                        }
                     }
-
                 }
             }
         }
@@ -7360,53 +5861,46 @@ exit;*/
         /* Get Set Eligibility Data Set for first choice program and second choice program
          */
 
-       
+
         /* Get CDI Data */
-         $submissions=Submissions::
-            where('submissions.district_id', Session::get('district_id'))
+        $submissions = Submissions::where('submissions.district_id', Session::get('district_id'))
             ->whereIn("submission_status", array("Waitlisted", "Declined / Waitlist for other"))
-//            ->where('submission_status', 'Denied due to Ineligibility')
-//            ->limit(5)
+            //            ->where('submission_status', 'Denied due to Ineligibility')
+            //            ->limit(5)
             ->get();
-//exit;//print_r($submissions);exit;
+        //exit;//print_r($submissions);exit;
 
         $firstdata = $seconddata = array();
         $programGrades = array();
-        foreach($submissions as $key=>$value)
-        {
+        foreach ($submissions as $key => $value) {
 
 
             $score = $this->collectionStudentGradeReport1($value, $subjects, $terms, $value->next_grade);
-            if(count($score) > 0)
-            {
+            if (count($score) > 0) {
 
                 $cdi_data = DB::table("submission_conduct_discplinary_info")->where("submission_id", $value->id)->first();
-                    if(!empty($cdi_data))
-                    {
-                        $cdiArr = array();
-                        $cdiArr['b_info'] = $cdi_data->b_info;
-                        $cdiArr['c_info'] = $cdi_data->c_info;
-                        $cdiArr['d_info'] = $cdi_data->d_info;
-                        $cdiArr['e_info'] = $cdi_data->e_info;
-                        $cdiArr['susp'] = $cdi_data->susp;
-                        $cdiArr['susp_days'] = $cdi_data->susp_days;
-                    }
-
-                    else
-                    {
-                        $cdiArr = array();
-                        $cdiArr['b_info'] = "";
-                        $cdiArr['c_info'] = "";
-                        $cdiArr['d_info'] = "";
-                        $cdiArr['e_info'] = "";
-                        $cdiArr['susp'] = "";
-                        $cdiArr['susp_days'] = "";
-                    }
+                if (!empty($cdi_data)) {
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = $cdi_data->b_info;
+                    $cdiArr['c_info'] = $cdi_data->c_info;
+                    $cdiArr['d_info'] = $cdi_data->d_info;
+                    $cdiArr['e_info'] = $cdi_data->e_info;
+                    $cdiArr['susp'] = $cdi_data->susp;
+                    $cdiArr['susp_days'] = $cdi_data->susp_days;
+                } else {
+                    $cdiArr = array();
+                    $cdiArr['b_info'] = "";
+                    $cdiArr['c_info'] = "";
+                    $cdiArr['d_info'] = "";
+                    $cdiArr['e_info'] = "";
+                    $cdiArr['susp'] = "";
+                    $cdiArr['susp_days'] = "";
+                }
 
 
                 $tmp = $this->convertToArray($value);
                 $choice = getApplicationProgramName($value->first_choice);
-                $tmp['first_program'] =getApplicationProgramName($value->first_choice);
+                $tmp['first_program'] = getApplicationProgramName($value->first_choice);
                 $tmp['first_choice'] = $value->first_choice;
                 $tmp['first_choice_program_id'] = $value->first_choice_program_id;
                 $tmp['second_choice_program_id'] = $value->second_choice_program_id;
@@ -7416,115 +5910,92 @@ exit;*/
                 $tmp['cdi'] = $cdiArr;
                 $tmp['magnet_employee'] = $value->mcp_employee;
                 $tmp['magnet_program_employee'] = $value->magnet_program_employee;
-                if($this->eligibility_grade_pass[$value->id]['first'] == "Pass")
-                {
+                if ($this->eligibility_grade_pass[$value->id]['first'] == "Pass") {
                     $tmp['grade_status'] = "Pass";
-                }
-                else
-                {
+                } else {
                     $tmp['grade_status'] = "Fail";
                 }
                 $firstdata[] = $tmp;
-
             }
         }
         $config_subjects = Config::get('variables.subjects');
         echo "Submission ID^Name^Submission Status^Next Grade^";
-        
-        foreach($subjects as $sbjct)
-        {
-            foreach($terms as $term)
-            {
-                echo $config_subjects[$sbjct] ." ".$term."^";
+
+        foreach ($subjects as $sbjct) {
+            foreach ($terms as $term) {
+                echo $config_subjects[$sbjct] . " " . $term . "^";
             }
         }
         echo "B Info^C Info^D Info^E Info^Susp^# Days Susp^Status<br>";
-        foreach($firstdata as $key=>$value)
-        {
-            echo $value['id']."^".($value['first_name']." ".$value['last_name'])."^".$value['submission_status']."^".$value['next_grade']."^";
+        foreach ($firstdata as $key => $value) {
+            echo $value['id'] . "^" . ($value['first_name'] . " " . $value['last_name']) . "^" . $value['submission_status'] . "^" . $value['next_grade'] . "^";
 
-            foreach($value['score'] as $skey=>$sbjct)
-            {
-                foreach($terms as $term)
-                {
-                                                                    
-                    if(isset($sbjct[$term]))
-                    {
-                        echo $sbjct[$term]."^";
-                    }
-                    else
-                    {
+            foreach ($value['score'] as $skey => $sbjct) {
+                foreach ($terms as $term) {
+
+                    if (isset($sbjct[$term])) {
+                        echo $sbjct[$term] . "^";
+                    } else {
                         echo "^";
                     }
                 }
             }
 
-            foreach($value['cdi'] as $vkey=>$vcdi)
-            {
-                foreach($terms as $term)
-                {
-                    echo $value['cdi'][$vkey]."^";
+            foreach ($value['cdi'] as $vkey => $vcdi) {
+                foreach ($terms as $term) {
+                    echo $value['cdi'][$vkey] . "^";
                 }
             }
             echo "<br>";
-
         }
-
-    
     }
 
 
-public function getSubmissionAcademicScoreMissing($submission_id, $courseType, $GradeName, $term1, $term2)
-{
-    $data = DB::table("submission_grade")->where("submission_id", $submission_id)->where("courseType", $courseType)->where("GradeName", $GradeName)->where(function ($query) use ($term1, $term2) {
-        $query->where('academicYear', $term1)
-              ->orWhere('academicYear', $term2);
-    })->first();
-    if(!empty($data))
-    {   
-        return $data->numericGrade;
-    }
-    else
+    public function getSubmissionAcademicScoreMissing($submission_id, $courseType, $GradeName, $term1, $term2)
     {
-        $student_id = DB::table("submissions")->where("id", $submission_id)->where("student_id", "<>", "")->select('student_id')->first();
-        if(!empty($student_id))
-        {
-            $data = DB::table("studentgrade")->where("stateID", $student_id->student_id)->where("courseType", $courseType)->where("GradeName", $GradeName)->where(function ($query) use ($term1, $term2) {
-                $query->where('academicYear', $term1)
-                  ->orWhere('academicYear', $term2);
-            })->first();
+        $data = DB::table("submission_grade")->where("submission_id", $submission_id)->where("courseType", $courseType)->where("GradeName", $GradeName)->where(function ($query) use ($term1, $term2) {
+            $query->where('academicYear', $term1)
+                ->orWhere('academicYear', $term2);
+        })->first();
+        if (!empty($data)) {
+            return $data->numericGrade;
+        } else {
+            $student_id = DB::table("submissions")->where("id", $submission_id)->where("student_id", "<>", "")->select('student_id')->first();
+            if (!empty($student_id)) {
+                $data = DB::table("studentgrade")->where("stateID", $student_id->student_id)->where("courseType", $courseType)->where("GradeName", $GradeName)->where(function ($query) use ($term1, $term2) {
+                    $query->where('academicYear', $term1)
+                        ->orWhere('academicYear', $term2);
+                })->first();
 
-            if(!empty($data))
-            {
-                foreach($data as $key=>$value)
-                {
-                    $grade_data = [
-                        'submission_id' => $submission_id,
-                        'academicYear' => $value->academicYear ?? null,
-                        'academicTerm' => $value->academicTerm ?? null,
-                        'courseTypeID' => $value->courseTypeID ?? null,
-                        'courseName' => $value->courseName ?? null,
-                        'numericGrade' => $value->numericGrade ?? null,
-                        'sectionNumber' => $value->sectionNumber ?? null,
-                        'courseType' => $value->courseType ?? null,
-                        'stateID' => $value->stateID ?? null,
-                        'GradeName' => $value->GradeName ?? null,
-                        'sequence' => $value->sequence ?? null,
-                        'courseFullName' => $value->courseFullName ?? null,
-                        'fullsection_number' => $value->fullsection_number ?? null,
-                    ];
-                    if($grade_data['academicYear'] != null)
-                    DB::table("submission_grade")->insert($grade_data);
+                if (!empty($data)) {
+                    foreach ($data as $key => $value) {
+                        $grade_data = [
+                            'submission_id' => $submission_id,
+                            'academicYear' => $value->academicYear ?? null,
+                            'academicTerm' => $value->academicTerm ?? null,
+                            'courseTypeID' => $value->courseTypeID ?? null,
+                            'courseName' => $value->courseName ?? null,
+                            'numericGrade' => $value->numericGrade ?? null,
+                            'sectionNumber' => $value->sectionNumber ?? null,
+                            'courseType' => $value->courseType ?? null,
+                            'stateID' => $value->stateID ?? null,
+                            'GradeName' => $value->GradeName ?? null,
+                            'sequence' => $value->sequence ?? null,
+                            'courseFullName' => $value->courseFullName ?? null,
+                            'fullsection_number' => $value->fullsection_number ?? null,
+                        ];
+                        if ($grade_data['academicYear'] != null)
+                            DB::table("submission_grade")->insert($grade_data);
+                    }
+                    return $data->numericGrade;
                 }
-                return $data->numericGrade;
             }
+            return "NA";
         }
-        return "NA";
     }
-}
 
 
-    public function collectionStudentGradeReport1($submission, $subjects, $terms, $next_grade=0)
+    public function collectionStudentGradeReport1($submission, $subjects, $terms, $next_grade = 0)
     {
 
         $config_subjects = Config::get('variables.subjects');
@@ -7533,49 +6004,37 @@ public function getSubmissionAcademicScoreMissing($submission_id, $courseType, $
         $gradeInfo = SubjectManagement::where("grade", $next_grade)->first();
 
         $first_failed = $second_failed = 0;
-        foreach($subjects as $value)
-        {
-            foreach($terms as $value1)
-            {
-                
-                $marks = $this->getSubmissionAcademicScoreMissing($submission->id, $config_subjects[$value], $value1, (date("Y")-1)."-".(date("Y")), (date("Y")-1)."-".(date("y")));
+        foreach ($subjects as $value) {
+            foreach ($terms as $value1) {
+
+                $marks = $this->getSubmissionAcademicScoreMissing($submission->id, $config_subjects[$value], $value1, (date("Y") - 1) . "-" . (date("Y")), (date("Y") - 1) . "-" . (date("y")));
                 /* Here copy above function if condition  for NA */
 
-                if($marks == "NA")
-                {
+                if ($marks == "NA") {
                     $score[$value][$value1] = "";
-                }
-                else
-                {
+                } else {
                     $score[$value][$value1] = $marks;
-
                 }
             }
         }
 
-        if($first_failed > 0 && $submission->grade_override == "N")
-        {
+        if ($first_failed > 0 && $submission->grade_override == "N") {
             $this->eligibility_grade_pass[$submission->id]['first'] = "Fail";
-        }
-        else
-        {
+        } else {
             $this->eligibility_grade_pass[$submission->id]['first'] = "Pass";
         }
 
-        if($second_failed > 0 && $submission->grade_override == "N")
-        {
+        if ($second_failed > 0 && $submission->grade_override == "N") {
             $this->eligibility_grade_pass[$submission->id]['second'] = "Fail";
-        }
-        else
-        {
+        } else {
             $this->eligibility_grade_pass[$submission->id]['second'] = "Pass";
         }
         return $score;
-    }   
+    }
 
     public function populationChange($enrollment_id)
     {
-         // Processing
+        // Processing
         $form_id = 1;
         $pid = $form_id;
         $from = "form";
@@ -7589,19 +6048,19 @@ public function getSubmissionAcademicScoreMissing($submission_id, $courseType, $
         $ids = array('"PreK"', '"K"', '"1"', '"2"', '"3"', '"4"', '"5"', '"6"', '"7"', '"8"', '"9"', '"10"', '"11"', '"12"');
         $ids_ordered = implode(',', $ids);
 
-        $rawOrder = DB::raw(sprintf('FIELD(submissions.next_grade, %s)', "'".implode(',', $ids)."'"));
+        $rawOrder = DB::raw(sprintf('FIELD(submissions.next_grade, %s)', "'" . implode(',', $ids) . "'"));
 
         $submissions = Submissions::where('district_id', $district_id)->where(function ($q) {
-                                $q->where(function ($q1) {
-                                    $q1->where("first_choice_final_status", "Offered")->where('second_choice_final_status', '<>', 'Offered');
-                                })
-                                  ->orWhere(function ($q1) {
-                                    $q1->where("second_choice_final_status", "Offered")->where('first_choice_final_status', '<>', 'Offered');
-                                });  
-                            })
-                            ->where('district_id', $district_id)->where("form_id", $form_id)->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
-                            ->where("submissions.version", 0)
-                            ->orderByRaw('FIELD(next_grade,'.implode(",",$ids).')')
+            $q->where(function ($q1) {
+                $q1->where("first_choice_final_status", "Offered")->where('second_choice_final_status', '<>', 'Offered');
+            })
+                ->orWhere(function ($q1) {
+                    $q1->where("second_choice_final_status", "Offered")->where('first_choice_final_status', '<>', 'Offered');
+                });
+        })
+            ->where('district_id', $district_id)->where("form_id", $form_id)->join("submissions_final_status", "submissions_final_status.submission_id", "submissions.id")
+            ->where("submissions.version", 0)
+            ->orderByRaw('FIELD(next_grade,' . implode(",", $ids) . ')')
             ->get(['first_choice_program_id', 'second_choice_program_id', 'next_grade', 'race', 'first_choice_final_status', 'second_choice_final_status', 'first_waitlist_for', 'second_waitlist_for']);
 
 
@@ -7609,12 +6068,12 @@ public function getSubmissionAcademicScoreMissing($submission_id, $courseType, $
         if (isset($submissions)) {
             foreach ($choices as $choice) {
                 foreach ($submissions as $key => $value) {
-                        if (!isset($programs[$value->$choice])) {
-                            $programs[$value->$choice] = [];
-                        }
-                        if (!in_array($value->next_grade, $programs[$value->$choice])) {
-                            array_push($programs[$value->$choice], $value->next_grade);
-                        }
+                    if (!isset($programs[$value->$choice])) {
+                        $programs[$value->$choice] = [];
+                    }
+                    if (!in_array($value->next_grade, $programs[$value->$choice])) {
+                        array_push($programs[$value->$choice], $value->next_grade);
+                    }
                 }
             }
         }
@@ -7631,37 +6090,32 @@ public function getSubmissionAcademicScoreMissing($submission_id, $courseType, $
                 if (!empty($availability)) {
                     foreach ($choices as $choice) {
 
-                        if($choice == "first_choice_program_id")
-                        {
+                        if ($choice == "first_choice_program_id") {
                             $submission_race_data = $submissions->where($choice, $program_id)->where('first_choice_final_status', "Offered")->where('second_choice_final_status', '<>', "Offered")->where("submissions.version", 0)
                                 ->where('next_grade', $grade);
-                         }
-                         else
-                         {
+                        } else {
                             $submission_race_data = $submissions->where($choice, $program_id)->where('second_choice_final_status', "Offered")->where('first_choice_final_status', '<>', "Offered")->where("submissions.version", 0)
                                 ->where('next_grade', $grade);
-                         }   
+                        }
                         $race = $submission_race_data->groupBy('race')->map->count();
                         if (count($race) > 0) {
                             $race_ary = array_merge($race_ary, $race->toArray());
-                            
+
                             if (count($race_count) > 0) {
-                                foreach ($race as $key => $value) { 
+                                foreach ($race as $key => $value) {
 
                                     if (isset($race_count[$key])) {
                                         $race_count[$key] = $race_count[$key] + $value;
-                                    }else{
+                                    } else {
                                         $race_count[$key] = 1;
                                     }
                                 }
-                            }else{
-                                
-                            
-                             $race_count = $race;
+                            } else {
 
+
+                                $race_count = $race;
                             }
                         }
-
                     }
 
                     $data = [
@@ -7676,9 +6130,9 @@ public function getSubmissionAcademicScoreMissing($submission_id, $courseType, $
                     ksort($race_ary);
                 }
             }
-           // exit;
+            // exit;
         }
-//        exit;
+        //        exit;
         // Submissions Result
         $enrollment = Enrollment::where("district_id", Session::get('district_id'))->get();
         return view("Reports::population_change", compact('data_ary', 'race_ary', 'pid', 'from', "display_outcome", "enrollment", "enrollment_id"));
@@ -7699,107 +6153,94 @@ public function getSubmissionAcademicScoreMissing($submission_id, $courseType, $
             ->get(['submissions.id', 'first_name', 'last_name', 'current_school', 'first_offered_rank', 'second_offered_rank', 'first_choice_program_id', 'second_choice_program_id', 'next_grade', 'race', 'first_choice_final_status', 'second_choice_final_status']);
 
         $final_data = array();
-        foreach($submissions as $key=>$value)
-        {
+        foreach ($submissions as $key => $value) {
+            $tmp = array();
+            $tmp['id'] = $value->id;
+            $tmp['name'] = $value->first_name . " " . $value->last_name;
+            $tmp['grade'] = $value->next_grade;
+            $tmp['school'] = $value->current_school;
+            $tmp['choice'] = 1;
+            $tmp['race'] = $value->race;
+            $tmp['program'] = getProgramName($value->first_choice_program_id) . " - Grade " . $value->next_grade;
+            $tmp['program_name'] = getProgramName($value->first_choice_program_id);
+            $tmp['offered_status'] = $value->first_choice_final_status;
+            if ($value->first_choice_final_status == "Offered")
+                $tmp['outcome'] = "<div class='alert1 alert-success text-center'>Offered</div>";
+            elseif ($value->first_choice_final_status == "Denied due to Ineligibility")
+                $tmp['outcome'] = "<div class='alert1 alert-info text-center'>Denied due to Ineligibility</div>";
+            elseif ($value->first_choice_final_status == "Waitlisted")
+                $tmp['outcome'] = "<div class='alert1 alert-warning text-center'>Waitlist</div>";
+            elseif ($value->first_choice_final_status == "Denied due to Incomplete Records")
+                $tmp['outcome'] = "<div class='alert1 alert-danger text-center'>Denied due to Incomplete Records</div>";
+            else
+                $tmp['outcome'] = "";
+
+            $final_data[] = $tmp;
+
+            if ($value->second_choice_program_id != 0) {
                 $tmp = array();
                 $tmp['id'] = $value->id;
-                $tmp['name'] = $value->first_name. " ". $value->last_name;
+                $tmp['name'] = $value->first_name . " " . $value->last_name;
                 $tmp['grade'] = $value->next_grade;
                 $tmp['school'] = $value->current_school;
-                $tmp['choice'] = 1;
                 $tmp['race'] = $value->race;
-                $tmp['program'] = getProgramName($value->first_choice_program_id). " - Grade ".$value->next_grade;
-                $tmp['program_name'] = getProgramName($value->first_choice_program_id);
-                $tmp['offered_status'] = $value->first_choice_final_status;
-                if($value->first_choice_final_status == "Offered")
+                $tmp['choice'] = 2;
+                $tmp['program'] = getProgramName($value->second_choice_program_id) . " - Grade " . $value->next_grade;
+                $tmp['program_name'] = getProgramName($value->second_choice_program_id);
+                $tmp['offered_status'] = $value->second_choice_final_status;
+
+                if ($value->second_choice_final_status == "Offered")
                     $tmp['outcome'] = "<div class='alert1 alert-success text-center'>Offered</div>";
-                elseif($value->first_choice_final_status == "Denied due to Ineligibility")
+                elseif ($value->second_choice_final_status == "Denied due to Ineligibility")
                     $tmp['outcome'] = "<div class='alert1 alert-info text-center'>Denied due to Ineligibility</div>";
-                elseif($value->first_choice_final_status == "Waitlisted")
+                elseif ($value->second_choice_final_status == "Waitlisted")
                     $tmp['outcome'] = "<div class='alert1 alert-warning text-center'>Waitlist</div>";
-                elseif($value->first_choice_final_status == "Denied due to Incomplete Records")
+                elseif ($value->second_choice_final_status == "Denied due to Incomplete Records")
                     $tmp['outcome'] = "<div class='alert1 alert-danger text-center'>Denied due to Incomplete Records</div>";
                 else
                     $tmp['outcome'] = "";
-
                 $final_data[] = $tmp;
-
-                if($value->second_choice_program_id != 0)
-                {
-                    $tmp = array();
-                    $tmp['id'] = $value->id;
-                    $tmp['name'] = $value->first_name. " ". $value->last_name;
-                    $tmp['grade'] = $value->next_grade;
-                    $tmp['school'] = $value->current_school;
-                    $tmp['race'] = $value->race;
-                    $tmp['choice'] = 2;
-                    $tmp['program'] = getProgramName($value->second_choice_program_id). " - Grade ".$value->next_grade;
-                    $tmp['program_name'] = getProgramName($value->second_choice_program_id);
-                    $tmp['offered_status'] = $value->second_choice_final_status;
-
-                    if($value->second_choice_final_status == "Offered")
-                        $tmp['outcome'] = "<div class='alert1 alert-success text-center'>Offered</div>";
-                    elseif($value->second_choice_final_status == "Denied due to Ineligibility")
-                        $tmp['outcome'] = "<div class='alert1 alert-info text-center'>Denied due to Ineligibility</div>";
-                    elseif($value->second_choice_final_status == "Waitlisted")
-                        $tmp['outcome'] = "<div class='alert1 alert-warning text-center'>Waitlist</div>";
-                    elseif($value->second_choice_final_status == "Denied due to Incomplete Records")
-                        $tmp['outcome'] = "<div class='alert1 alert-danger text-center'>Denied due to Incomplete Records</div>";
-                    else
-                        $tmp['outcome'] = "";
-                    $final_data[] = $tmp;
-                }
-
+            }
         }
         $grade = $outcome = array();
-        foreach($final_data as $key=>$value)
-        {
-            $grade['grade'][] = $value['grade']; 
-            $outcome['outcome'][] = $value['outcome']; 
+        foreach ($final_data as $key => $value) {
+            $grade['grade'][] = $value['grade'];
+            $outcome['outcome'][] = $value['outcome'];
         }
         array_multisort($grade['grade'], SORT_ASC, $outcome['outcome'], SORT_DESC, $final_data);
-         $enrollment = Enrollment::where("district_id", Session::get('district_id'))->get();
+        $enrollment = Enrollment::where("district_id", Session::get('district_id'))->get();
         return view("Reports::submissions_result", compact('final_data', 'pid', 'from', 'display_outcome', "enrollment", "enrollment_id"));
     }
 
-    public function duplicate_student($enrollment_id=0, $type=0)
-    {     
+    public function duplicate_student($enrollment_id = 0, $type = 0)
+    {
         $enrollment = Enrollment::where("district_id", Session::get('district_id'))->get();
-        if($type == 0)
-        {
-                $data = DB::table("submissions")->where("late_submission", "N")->select('first_name', 'last_name', 'parent_first_name', 'parent_last_name', DB::raw("count(last_name) as total_quantity"))
-                    ->groupBy('first_name', 'last_name', 'parent_first_name', 'parent_last_name')->havingRaw('count(last_name) > 1')
-                    ->get();
-        }
-        else
-        {
-                $data = DB::table("submissions")->where("late_submission", "Y")->select('first_name', 'last_name', 'parent_first_name', 'parent_last_name', DB::raw("count(last_name) as total_quantity"))
-                    ->groupBy('first_name', 'last_name', 'parent_first_name', 'parent_last_name')->havingRaw('count(last_name) > 1')
-                    ->get();
+        if ($type == 0) {
+            $data = DB::table("submissions")->where("late_submission", "N")->select('first_name', 'last_name', 'parent_first_name', 'parent_last_name', DB::raw("count(last_name) as total_quantity"))
+                ->groupBy('first_name', 'last_name', 'parent_first_name', 'parent_last_name')->havingRaw('count(last_name) > 1')
+                ->get();
+        } else {
+            $data = DB::table("submissions")->where("late_submission", "Y")->select('first_name', 'last_name', 'parent_first_name', 'parent_last_name', DB::raw("count(last_name) as total_quantity"))
+                ->groupBy('first_name', 'last_name', 'parent_first_name', 'parent_last_name')->havingRaw('count(last_name) > 1')
+                ->get();
         }
 
 
         $dispData = [];
-        foreach($data as $key=>$value)
-        {
+        foreach ($data as $key => $value) {
             $first_name = $value->first_name;
             $last_name = $value->last_name;
             $parent_first_name = $value->parent_first_name;
             $parent_last_name = $value->parent_last_name;
-            if($type == 0)
-            {
+            if ($type == 0) {
                 $submissions = Submissions::where("first_name", $first_name)->where("late_submission", "N")->where("last_name", $last_name)->where("parent_first_name", $parent_first_name)->where("parent_last_name", $parent_last_name)->get();
-            }
-            else
-            {
+            } else {
                 $submissions = Submissions::where("first_name", $first_name)->where("late_submission", "Y")->where("last_name", $last_name)->where("parent_first_name", $parent_first_name)->where("parent_last_name", $parent_last_name)->get();
             }
-            
+
             $tmp = [];
-            if(count($submissions) > 0)
-            {
-                foreach($submissions as $sk=>$sv)
-                {
+            if (count($submissions) > 0) {
+                foreach ($submissions as $sk => $sv) {
                     $tmp1 = array();
                     $tmp1['first_name'] = $sv->first_name;
                     $tmp1['last_name'] = $sv->last_name;
@@ -7816,34 +6257,32 @@ public function getSubmissionAcademicScoreMissing($submission_id, $courseType, $
                     $tmp[] = $tmp1;
                 }
             }
-            if(count($tmp) > 0)
-            {
+            if (count($tmp) > 0) {
                 $dispData[] = $tmp;
             }
         }
 
-        return view("Reports::duplicate_student", compact('enrollment_id','enrollment','dispData','type'));
+        return view("Reports::duplicate_student", compact('enrollment_id', 'enrollment', 'dispData', 'type'));
     }
 
     public function gradeCdiUploadList($enrollment_id)
     {
         $enrollment = Enrollment::where("district_id", Session::get('district_id'))->get();
-        $gradecdilist = Submissions::
-                        whereRaw('id in (SELECT submission_id FROM grade_cdi_files)')->get();
+        $gradecdilist = Submissions::whereRaw('id in (SELECT submission_id FROM grade_cdi_files)')->get();
 
-        return view("Reports::grade_cdi_upload_list", compact('enrollment','enrollment_id','gradecdilist'));
+        return view("Reports::grade_cdi_upload_list", compact('enrollment', 'enrollment_id', 'gradecdilist'));
     }
 
     public function gradeCdiUploadConfirmed($submission_id, $type)
     {
-        $data = Submissions::where('id',$submission_id)->first();
-        if(isset($data)){
+        $data = Submissions::where('id', $submission_id)->first();
+        if (isset($data)) {
             if ($type == 'grade') {
-                Submissions::where('id',$submission_id)->update(['grade_upload_confirmed'=>'Y','grade_upload_confirmed_by'=>Auth::user()->id, 'grade_upload_confirmed_at'=>date("Y-m-d H:i:s")]);
-                Session::flash('success','Grades Confirmed successfully.');
-            }else if($type == 'cdi'){
-                Submissions::where('id',$submission_id)->update(['cdi_upload_confirmed'=>'Y','cdi_upload_confirmed_by'=>Auth::user()->id, 'cdi_upload_confirmed_at'=>date("Y-m-d H:i:s")]);
-                Session::flash('success','CDI Confirmed successfully.');
+                Submissions::where('id', $submission_id)->update(['grade_upload_confirmed' => 'Y', 'grade_upload_confirmed_by' => Auth::user()->id, 'grade_upload_confirmed_at' => date("Y-m-d H:i:s")]);
+                Session::flash('success', 'Grades Confirmed successfully.');
+            } else if ($type == 'cdi') {
+                Submissions::where('id', $submission_id)->update(['cdi_upload_confirmed' => 'Y', 'cdi_upload_confirmed_by' => Auth::user()->id, 'cdi_upload_confirmed_at' => date("Y-m-d H:i:s")]);
+                Session::flash('success', 'CDI Confirmed successfully.');
             }
         }
         return redirect()->back();

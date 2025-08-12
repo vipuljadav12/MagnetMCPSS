@@ -5,8 +5,6 @@ namespace App\Modules\Submissions\Models;
 use Illuminate\Database\Eloquent\Model;
 
 class SubmissionGradeChange extends Model {
-
-    //
     protected $table='grade_change';
     protected $primaryKey='id';
     protected $fillable=[

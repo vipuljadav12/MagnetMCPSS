@@ -1,4 +1,7 @@
 <?php
+
+use Illuminate\Support\Facades\Route;
+
 Route::group([ 'prefix'=>'admin/DeniedSpace','module' => 'DeniedSpace', 'middleware' => ['web','auth','super'], 'namespace' => 'App\Modules\DeniedSpace\Controllers'], function() {
 
     Route::get('/', 'DeniedSpaceController@form_index');

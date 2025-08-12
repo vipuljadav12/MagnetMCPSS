@@ -4,9 +4,9 @@ namespace App\Modules\Program\Controllers;
 
 use App\Modules\Program\Models\Program;
 use App\Modules\Program\Models\ProgramEligibility;
-use Session;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Session;
 
 class ProgramController extends Controller
 {
@@ -41,8 +41,6 @@ class ProgramController extends Controller
      */
     public function store(Request $request)
     {
-
-        //
         return $request;
         $msg=['priority.required'=>'The priority field is required. ','grade_lavel.required'=>'The grade lavel field is required.','applicant_filter1.required'=>'The Applicant Group Filter 1 is required. '];
         $request->validate([

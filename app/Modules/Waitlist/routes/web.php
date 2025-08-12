@@ -1,9 +1,11 @@
 <?php
 
-Route::group(['prefix' => 'admin/Waitlist','module' => 'Waitlist', 'middleware' => ['web','auth'], 'namespace' => 'App\Modules\Waitlist\Controllers'], function() {
+use Illuminate\Support\Facades\Route;
+
+Route::group(['prefix' => 'admin/Waitlist', 'module' => 'Waitlist', 'middleware' => ['web', 'auth'], 'namespace' => 'App\Modules\Waitlist\Controllers'], function () {
 
     Route::get('/', 'WaitlistController@index');
-       Route::get('/Process/Selection/validate/application/{application_id}', 'WaitlistController@validateApplication');
+    Route::get('/Process/Selection/validate/application/{application_id}', 'WaitlistController@validateApplication');
 
 
     Route::post('/Availability/store', 'WaitlistController@storeAllAvailability');
@@ -25,10 +27,10 @@ Route::group(['prefix' => 'admin/Waitlist','module' => 'Waitlist', 'middleware' 
 
     Route::get('/Population/Version/{version}', 'WaitlistController@population_change_version');
     Route::get('/Submission/Result/Version/{version}', 'WaitlistController@submissions_results_version');
-    
+
     Route::get('/Submission/Result/{value}', 'WaitlistController@submissions_results');
     Route::get('/Submission/Result', 'WaitlistController@submissions_results');
-    
+
     Route::get('/Submission/SeatsStatus/Version/{value}', 'WaitlistController@seatStatusVersion');
     #Route::get('/Submission/Result', 'WaitlistController@submissions_result');
 
@@ -39,9 +41,9 @@ Route::group(['prefix' => 'admin/Waitlist','module' => 'Waitlist', 'middleware' 
 
     //Route::get('/Revert/list', 'ProcessSelectionController@selection_revert');
 
-    Route::get('/EditCommunication/','WaitlistEditCommunicationController@index');
+    Route::get('/EditCommunication/', 'WaitlistEditCommunicationController@index');
 
-    Route::post('/EditCommunication/get/emails','WaitlistEditCommunicationController@fetchEmails');
+    Route::post('/EditCommunication/get/emails', 'WaitlistEditCommunicationController@fetchEmails');
 
     Route::get('/EditCommunication/download/{id}',  'WaitlistEditCommunicationController@downloadFile');
 
@@ -49,17 +51,15 @@ Route::group(['prefix' => 'admin/Waitlist','module' => 'Waitlist', 'middleware' 
     Route::get('/EditCommunication/preview/email/{status}', 'WaitlistEditCommunicationController@previewEmail');
 
 
-    Route::get('/EditCommunication/{status}','WaitlistEditCommunicationController@index');
-    Route::post('/EditCommunication/store/letter','WaitlistEditCommunicationController@storeLetter');
-    Route::post('/EditCommunication/store/email','WaitlistEditCommunicationController@storeEmail');
-    Route::get('/EditCommunication/communicationPDF/{form_name}','WaitlistEditCommunicationController@generatePDF');
-    Route::get('/EditCommunication/communicationEmail/{form_name}','WaitlistEditCommunicationController@generateEmail');
-    
-    Route::get('/EditCommunication/lettersLog','WaitlistEditCommunicationController@lettersLog');
-    Route::get('/EditCommunication/deletePDF/{id}','WaitlistEditCommunicationController@deleteLettersLog');
+    Route::get('/EditCommunication/{status}', 'WaitlistEditCommunicationController@index');
+    Route::post('/EditCommunication/store/letter', 'WaitlistEditCommunicationController@storeLetter');
+    Route::post('/EditCommunication/store/email', 'WaitlistEditCommunicationController@storeEmail');
+    Route::get('/EditCommunication/communicationPDF/{form_name}', 'WaitlistEditCommunicationController@generatePDF');
+    Route::get('/EditCommunication/communicationEmail/{form_name}', 'WaitlistEditCommunicationController@generateEmail');
 
-    Route::get('/EditCommunication/emailsLog','WaitlistEditCommunicationController@emailsLog');
-    Route::get('/EditCommunication/deleteemailsLog/{id}','WaitlistEditCommunicationController@deleteEmailsLog');
+    Route::get('/EditCommunication/lettersLog', 'WaitlistEditCommunicationController@lettersLog');
+    Route::get('/EditCommunication/deletePDF/{id}', 'WaitlistEditCommunicationController@deleteLettersLog');
 
-
+    Route::get('/EditCommunication/emailsLog', 'WaitlistEditCommunicationController@emailsLog');
+    Route::get('/EditCommunication/deleteemailsLog/{id}', 'WaitlistEditCommunicationController@deleteEmailsLog');
 });

@@ -5,16 +5,17 @@ namespace App\Modules\Eligibility\Controllers;
 use App\Modules\Application\Models\Application;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
-use Session;
-use View;
-use Config;
 use App\Modules\School\Models\Grade;
 use App\Modules\Eligibility\Models\SubjectManagement;
 use App\Traits\AuditTrail;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\View;
 
 class SubjectManagementController extends Controller
 {
     use AuditTrail;
+    public $url;
     /**
      * Display a listing of the resource.
      *

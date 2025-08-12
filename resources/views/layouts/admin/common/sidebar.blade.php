@@ -395,12 +395,12 @@
                 @endif
                 @if (checkPermission(Auth::user()->role_id, 'Configuration') == 1)
                     <li
-                        class="{{ Request::is('admin/Reports/process/logs*') || Request::is('admin/Files*') || Request::is('admin/Configuration*') || Request::is('admin/AuditTrailData*') || Request::is('admin/DistrictConfiguration') || Request::is('admin/ZonedSchool/overrideAddress*') || Request::is('admin/Users*') || Request::is('admin/DistrictConfiguration/student/search*') ? 'mm-active' : '' }}">
+                        class="{{ Request::is('admin/Reports/process/logs*') || Request::is('admin/Files*') || Request::is('admin/Configuration') || Request::is('admin/AuditTrailData*') || Request::is('admin/DistrictConfiguration') || Request::is('admin/ZonedSchool/overrideAddress*') || Request::is('admin/Users*') || Request::is('admin/DistrictConfiguration/student/search*') ? 'mm-active' : '' }}">
                         <a title="Configuration" href="javascript:void(0);"
-                            class="{{ Request::is('admin/Reports/process/logs*') || Request::is('admin/Files*') || Request::is('admin/Configuration*') || Request::is('admin/AuditTrailData*') || Request::is('admin/DistrictConfiguration') || Request::is('admin/ZonedSchool/overrideAddress*') || Request::is('admin/Users*') || Request::is('admin/DistrictConfiguration/student/search*') ? 'mm-active' : '' }}"><i
+                            class="{{ Request::is('admin/Reports/process/logs*') || Request::is('admin/Files*') || Request::is('admin/Configuration') || Request::is('admin/AuditTrailData*') || Request::is('admin/DistrictConfiguration') || Request::is('admin/ZonedSchool/overrideAddress*') || Request::is('admin/Users*') || Request::is('admin/DistrictConfiguration/student/search*') ? 'mm-active' : '' }}"><i
                                 class="fas fa-cog"></i><span>Administration</span> <span
                                 class="menu-arrow"></span></a>
-                        <ul class="nav-second-level {{ Request::is('admin/Reports/process/logs*') || Request::is('admin/Files*') || Request::is('admin/Configuration*') || Request::is('admin/AuditTrailData*') || Request::is('admin/DistrictConfiguration') || Request::is('admin/ZonedSchool/overrideAddress*') || Request::is('admin/Users*') || Request::is('admin/DistrictConfiguration/student/search*') ? 'mm-show' : '' }}"
+                        <ul class="nav-second-level {{ Request::is('admin/Reports/process/logs*') || Request::is('admin/Files*') || Request::is('admin/Configuration') || Request::is('admin/AuditTrailData*') || Request::is('admin/DistrictConfiguration') || Request::is('admin/ZonedSchool/overrideAddress*') || Request::is('admin/Users*') || Request::is('admin/DistrictConfiguration/student/search*') ? 'mm-show' : '' }}"
                             aria-expanded="false">
                             <!--<li><a title="Header & Footer" href="header-footer-configuration.html"><span>Header &amp; Footer</span></a></li>
                             <li><a title="Eligibility" href="eligibility.html"><span>Eligibility</span></a></li>

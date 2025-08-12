@@ -395,8 +395,8 @@
     </form>
 @endsection
 @section('scripts')
-    <script src="{{asset('resources/assets/common/js/jquery.validate.min.js')}}"></script>
-    <script src="{{asset('resources/assets/common/js/additional-methods.min.js')}}"></script>
+    <script src="{{asset('resources/assets/admin/js/jquery.validate.min.js')}}"></script>
+    <script src="{{asset('resources/assets/admin/js/additional-methods.min.js')}}"></script>
     <script type="text/javascript" src="{{asset('resources/assets/admin/plugins/jquery-ui/jquery-ui.min.js')}}"></script>
      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/select2/3.5.2/select2.min.js"></script>
 

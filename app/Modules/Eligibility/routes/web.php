@@ -1,13 +1,15 @@
 <?php
+
 use App\Modules\Application\Models\Application;
 use App\Modules\SetEligibility\Models\SetEligibility;
+use Illuminate\Support\Facades\Route;
 
-Route::group([ 'prefix'=>'admin/Eligibility','module' => 'Eligibility', 'middleware' => ['web','auth'], 'namespace' => 'App\Modules\Eligibility\Controllers'], function() {
+Route::group(['prefix' => 'admin/Eligibility', 'module' => 'Eligibility', 'middleware' => ['web', 'auth'], 'namespace' => 'App\Modules\Eligibility\Controllers'], function () {
 
     Route::get('/', 'EligibilityController@index');
     Route::get('/create', 'EligibilityController@create');
     Route::get('/getTemplateHtml/{id}', 'EligibilityController@getTemplateHtml');
-   Route::post('/store', 'EligibilityController@store');
+    Route::post('/store', 'EligibilityController@store');
     Route::get('/edit/{eligibility}', 'EligibilityController@edit');
     Route::post('/update/{id}', 'EligibilityController@update');
     Route::get('/delete/{id}', 'EligibilityController@delete');
@@ -20,11 +22,10 @@ Route::group([ 'prefix'=>'admin/Eligibility','module' => 'Eligibility', 'middlew
     Route::get('/subjectManagement/{id?}', 'SubjectManagementController@index');
     Route::post('/updateSubjectManagement', 'SubjectManagementController@updateSubjectManagement');
 
-    Route::get('/test',function(){
-        $old_application_ids_array = Application::where('district_id',session('district_id'))->where('enrollment_id',15)->pluck('id');
-        $set_eligibility = SetEligibility::where('district_id',session('district_id'))->whereIn('application_id',$old_application_ids_array)->get();
+    Route::get('/test', function () {
+        $old_application_ids_array = Application::where('district_id', session('district_id'))->where('enrollment_id', 15)->pluck('id');
+        $set_eligibility = SetEligibility::where('district_id', session('district_id'))->whereIn('application_id', $old_application_ids_array)->get();
 
         return $set_eligibility;
     });
-
 });

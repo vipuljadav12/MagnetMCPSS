@@ -50,8 +50,8 @@
     </div>
 @endsection
 @section('scripts')
-    <script src="{{asset('resources/assets/common/js/jquery.validate.min.js')}}"></script>
-    <script src="{{asset('resources/assets/common/js/additional-methods.min.js')}}"></script>
+    <script src="{{asset('resources/assets/admin/js/jquery.validate.min.js')}}"></script>
+    <script src="{{asset('resources/assets/admin/js/additional-methods.min.js')}}"></script>
     <script type="text/javascript">
         $(document).ready(function() {
                 $(".alert").delay(2000).fadeOut(1000);

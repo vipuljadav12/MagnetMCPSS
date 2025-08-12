@@ -1,6 +1,8 @@
 <?php
 
-Route::group(['prefix'=>'admin/DistrictConfiguration', 'module' => 'DistrictConfiguration', 'middleware' => ['web', 'auth'], 'namespace' => 'App\Modules\DistrictConfiguration\Controllers'], function() {
+use Illuminate\Support\Facades\Route;
+
+Route::group(['prefix' => 'admin/DistrictConfiguration', 'module' => 'DistrictConfiguration', 'middleware' => ['web', 'auth'], 'namespace' => 'App\Modules\DistrictConfiguration\Controllers'], function () {
 
 	Route::get('/', 'DistrictConfigurationController@index');
 	Route::post('/store', 'DistrictConfigurationController@store');
@@ -11,7 +13,7 @@ Route::group(['prefix'=>'admin/DistrictConfiguration', 'module' => 'DistrictConf
 
 	Route::get('/edit_waitlist_text', 'DistrictConfigurationController@edit_waitlist_text');
 	Route::post('/saveWaitlistEditText', 'DistrictConfigurationController@saveWaitlistEditText');
-	
+
 	Route::get('/edit_email', 'DistrictConfigurationController@edit_email');
 	Route::post('/saveEditEmail', 'DistrictConfigurationController@saveEditEmail');
 	Route::get('preview/thanks/email/{email_type}', 'DistrictConfigurationController@previewThanksEmail');
@@ -28,5 +30,4 @@ Route::group(['prefix'=>'admin/DistrictConfiguration', 'module' => 'DistrictConf
 	Route::post('/saveLateSubmissionEditText', 'DistrictConfigurationController@saveSubmissionEditText');
 
 	Route::post('Send/Test/Mail', 'DistrictConfigurationController@sendTestMail');
-
 });

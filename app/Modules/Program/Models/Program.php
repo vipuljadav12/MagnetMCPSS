@@ -4,12 +4,11 @@ namespace App\Modules\Program\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Program extends Model {
-
-    //
-    protected $table='program';
-    public $primaryKey='id';
-    public $fillable=[
+class Program extends Model
+{
+    protected $table = 'program';
+    public $primaryKey = 'id';
+    public $fillable = [
         'district_id',
         'enrollment_id',
         'name',
@@ -44,7 +43,6 @@ class Program extends Model {
         'magnet_priorities'
 
     ];
-
 }
 
 

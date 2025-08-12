@@ -4,10 +4,10 @@ namespace App\Modules\Permission\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class RolePermission extends Model {
-
+class RolePermission extends Model
+{
     protected $table = 'roles_permissions';
-    
+
     protected $primaryKey = 'id';
 
     protected $fillable = [
@@ -15,8 +15,8 @@ class RolePermission extends Model {
         'permission_id',
     ];
 
-    public function scopeCreate($query,$data){
-    	return $query->create($data);
+    public function scopeCreate($query, $data)
+    {
+        return $query->create($data);
     }
-
 }

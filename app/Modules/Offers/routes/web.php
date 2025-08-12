@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
+
 Route::group([ 'prefix'=>'Offers','module' => 'Offers', 'middleware' => ['web'], 'namespace' => 'App\Modules\Offers\Controllers'], function() {
 
     Route::get('/{slug}', 'OffersController@offerChoice');

@@ -4,18 +4,18 @@ namespace App\Modules\Enrollment\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Enrollment extends Model {
+class Enrollment extends Model
+{
 
-    protected $fillable = [
-    	'district_id', 
-    	'school_year',
-    	'confirmation_style',
-    	'import_grades_by',
-    	'begning_date',
-    	'ending_date',
-    	'perk_birthday_cut_off',
-    	'kindergarten_birthday_cut_off',
-    	'first_grade_birthday_cut_off',
-    ];
-
+	protected $fillable = [
+		'district_id',
+		'school_year',
+		'confirmation_style',
+		'import_grades_by',
+		'begning_date',
+		'ending_date',
+		'perk_birthday_cut_off',
+		'kindergarten_birthday_cut_off',
+		'first_grade_birthday_cut_off',
+	];
 }
