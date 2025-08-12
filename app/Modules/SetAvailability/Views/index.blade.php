@@ -74,7 +74,6 @@
                 $(document).find(".AjaxContent").html(result);
             }
         });
-        console.log(selected);
         matchWithTotal();
     };
     function matchWithTotal()

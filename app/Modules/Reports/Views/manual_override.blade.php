@@ -158,7 +158,6 @@
                             });
 
                              $(document).on('change','.grade_override', function() {
-                                console.log('s');
                                   var click=$(this).prop('checked')==true ? 'Y' : 'N' ;
                                   $('#grade_override_status').val(click);
                                   $('#sid').val($(this).attr("id").replace("radio", ""));

@@ -71,7 +71,6 @@
     	$(document).find("#input_container_builder").find(".form-group-input").each(function(key)
     	{
     		id = $(this).attr("data-build-id");
-    		console.log(id);
     		if(id != undefined)
     		{
     			// list[key] = id;

@@ -9,8 +9,6 @@
             type: 'GET',  // http method
             // data: { _token: '{{csrf_token()}}' }, 
             success: function (result) {
-                // console.log(result.content_html);
-                console.log(result);
                 $(document).find("#optionContent").html(result);
                 if(template_id == "3" || template_id == "8")
                 {
@@ -91,7 +89,6 @@
                                 '<div class="question-list mt-10"></div>'+
                             '</div>'+
                         '</div>';
-        console.log("Header : "+i);
         $(this).parents(".card-body").find(".form-list").append(header);
         custsort();
     });
@@ -114,7 +111,6 @@
                                 '</div>'+
                             '</div>'+
                         '</div>';
-        console.log("option : "+i);
         // console.log( $(this).parent().parent(".form-group"));
         $(this).parent().parent().children(".option-list").append(option);
         custsort2();
@@ -154,7 +150,6 @@
     $(document).on("change","#selectDataType",function()
     {
         var selected = $(this).val();
-        console.log(selected);
         $(document).find("#selectScoreMethod").parent().parent().removeClass("d-none");
         if(selected != "DD")
         {
@@ -172,7 +167,6 @@
     $(document).on("change","#selectDataTypeConduct",function()
     {
         var selected = $(this).val();
-        console.log(selected);
         $(document).find("#selectScoreMethod").parent().parent().removeClass("d-none");
         if(selected != "DD")
         {
@@ -190,7 +184,6 @@
     $(document).on("change","#selectScoreMethod",function()
     {
         var selected = $(this).val();
-        console.log(selected);
         var currentObj = $(document).find(".scoreType"+selected);
         currentObj.removeClass("d-none");
         currentObj.siblings(".scoreTypeDiv").addClass("d-none");
@@ -198,7 +191,6 @@
     $(document).on("change","#selectScoreMethodAGC",function()
     {
         var selected = $(this).val();
-        console.log(selected);
         var currentObj = $(document).find(".scoreType"+selected);
         currentObj.removeClass("d-none");
         currentObj.siblings(".scoreTypeDiv").addClass("d-none");

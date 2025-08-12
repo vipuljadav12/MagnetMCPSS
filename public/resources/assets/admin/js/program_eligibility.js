@@ -40,8 +40,6 @@ $(document).ready(function()
 				if($(this).prop("checked") == true)
 				{
 					strGrade += $(this).val()+"-";
-					console.log("initiate strGrade = "+ strGrade);
-
 				}
 			})
 

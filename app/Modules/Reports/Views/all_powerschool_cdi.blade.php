@@ -71,7 +71,6 @@
                           targets: [8],
                           createdCell: function(cell) {
                             var $cell = $(cell);
-                            console.log($cell.text().length);
                             if($cell.text().length > 60) {
                                 $(cell).contents().wrapAll("<div class='content'></div>");
                                 var $content = $cell.find(".content");
