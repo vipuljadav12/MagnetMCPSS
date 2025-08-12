@@ -1,0 +1,332 @@
+<!doctype html>
+<html>
+<head>
+    @include("layouts.front.common.head")
+    <style type="text/css">
+        label.error{color: red;}
+
+    </style>
+    <script type="text/javascript" src="{{url('/resources/assets/admin/js/jquery/jquery-3.4.1.min.js')}}"></script> 
+    <style type="text/css">.hidden {display:none;}</style>
+ </head>
+<body>
+    @include("layouts.front.common.header")
+<main>
+    <div class="container">
+        <div class="mt-20 d-flex flex-wrap justify-content-around">
+            {!! getTopLinks() !!}
+            
+        </div>
+        @yield("content")
+    
+    </div>
+</main>
+<footer>
+    
+<!-- Modal HTML -->
+<div class="modal fade" id="infopopup">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <!-- Modal Header -->
+            <div class="modal-header">
+                <h4 class="modal-title">Marketplace Order Fulfillment</h4>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+        
+            <!-- Modal body -->
+            <div class="modal-body">
+                <div class="modal-content">
+                </div>
+          
+                
+            </div>
+    
+        </div>
+    </div>
+</div>
+
+
+</footer>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script> 
+<script type="text/javascript" src="{{url('/resources/assets/admin/js/bootstrap/bootstrap.min.js')}}"></script> 
+<script type="text/javascript" src="{{url('/resources/assets/admin/js/switchery.min.js')}}"></script> 
+<script type="text/javascript" src="{{url('/resources/assets/admin/plugins/bootstrap-datepicker/js/bootstrap-datepicker.min.js')}}"></script>
+<script type="text/javascript" src="{{url('/resources/assets/admin/plugins/bootstrap-datepicker/js/bs-date-picker-init.js')}}"></script>
+<script src="{{asset('resources/assets/admin/js/jquery.validate.min.js')}}"></script>
+<script src="{{asset('resources/assets/admin/js/additional-methods.min.js')}}"></script>
+<script src="{{url('/resources/assets/front/js/jquery/jquery_input_mask.js')}}"></script>
+
+@yield("scripts")
+<script type="text/javascript">
+        $('.ls-modal').on('click', function(e){
+          e.preventDefault();
+          $('#infopopup').modal('show').find('.modal-title').html($(this).attr('title'));
+          $('#infopopup').modal('show').find('.modal-body').load($(this).attr('href'));
+        });
+
+        function removeValidateSubmit()
+        {
+            $("input").removeAttr("required"); 
+            //$("#programform").unbind('submit');
+        }
+
+        function changeNextGrade(obj)
+        {
+            $('#next_grade').children('option:not(:first)').remove();
+            if($.isNumeric($(obj).val()))
+            {
+                addNormalGrade(parseInt($(obj).val())+1);
+            }
+            else if($(obj).val()=="PreK")
+            {
+                $("#next_grade").append('<option value="K">K</option>');
+                addNormalGrade(1);
+            }
+            else if($(obj).val()=="K")
+            {
+                addNormalGrade(1); 
+            }
+            else
+            {
+                $("#next_grade").append('<option value="PreK">PreK</option>');
+                $("#next_grade").append('<option value="K">K</option>');
+                addNormalGrade(1);   
+            }
+        }
+
+        function addNormalGrade(val)
+        {
+            for(i=val; i <= 12; i++)
+            {
+                $("#next_grade").append('<option value="'+i+'">'+i+'</option>');
+            }
+        }
+
+        $("#first_choice").change(function(){
+          var val = $(this).val();
+          
+          $('#second_choice > option').each(function(){
+              if($(this).val() == val && val != "")
+                $(this).addClass("d-none");
+              else
+                $(this).removeClass("d-none");
+          });
+        })
+
+        $("#second_choice").change(function(){
+          var val = $(this).val();
+          $('#first_choice > option').each(function(){
+              if($(this).val() == val && val != "")
+                $(this).addClass("d-none");
+              else
+                $(this).removeClass("d-none");
+          });
+        })
+
+        $(document).ready(function() 
+        {
+           $( function() {
+            $(".help").tooltip();
+          });
+            if($("#phone_number").length > 0)
+            {
+                $('#phone_number').inputmask("(999) 999-9999");
+            }
+            if($("#alternate_number").length > 0)
+            {
+                $('#alternate_number').inputmask("(999) 999-9999");
+            }
+
+            const monthNames = ["January", "February", "March", "April", "May", "June",
+              "July", "August", "September", "October", "November", "December"
+            ];
+              var qntYears = 30;
+              var selectYear = $("#year");
+              var selectMonth = $("#month");
+              var selectDay = $("#day");
+              var currentYear = new Date().getFullYear();
+              
+              for (var y = 0; y < qntYears; y++){
+                let date = new Date(currentYear);
+                var yearElem = document.createElement("option");
+                yearElem.value = currentYear 
+                yearElem.textContent = currentYear;
+                selectYear.append(yearElem);
+                currentYear--;
+              } 
+
+              for (var m = 0; m < 12; m++){
+                  let monthNum = new Date(2018, m).getMonth()
+                  let month = monthNames[monthNum];
+                  var monthElem = document.createElement("option");
+                  monthElem.value = monthNum+1  ; 
+                  monthElem.textContent = month;
+                  selectMonth.append(monthElem);
+                }
+
+                
+                var d = new Date();
+                  var month = d.getMonth();
+                  var year = d.getFullYear();
+                  var day = d.getDate();
+                  selectYear.val(year); 
+                  selectMonth.val(month);
+                  selectDay.val(day)
+                
+                
+                selectYear.on("change", AdjustDays);  
+                selectMonth.on("change", AdjustDays);
+                AdjustDays();
+                
+                
+                function AdjustDays(){
+                  var year = selectYear.val();
+                  var month = parseInt(selectMonth.val()) + 1;
+                  selectDay.empty();
+                  
+                  //get the last day, so the number of days in that month
+                  var days = new Date(year, month, 0).getDate(); 
+                  
+                  //lets create the days of that month
+                  for (var d = 1; d <= days; d++){
+                    var dayElem = document.createElement("option");
+                    dayElem.value = d; 
+                    dayElem.textContent = d;
+                    selectDay.append(dayElem);
+                  }
+                }
+                if($("#birthdayFiller").length > 0)
+                {
+                  if($("#birthdayFiller").val() != "")
+                  {
+                      var tmpDate = $("#birthdayFiller").val().split("-");
+                      if(typeof tmpDate[0] !=='undefined')
+                      {
+                        selectYear.val(tmpDate[0]);
+                      }
+                      if(typeof tmpDate[1] !=='undefined')
+                      {
+                        selectMonth.val(tmpDate[1]);
+                      }
+                      if(typeof tmpDate[2] !=='undefined')
+                      {
+                        selectDay.val(tmpDate[2]);
+                      }
+                  }    
+                }
+
+                if($("#mcp_employee_enable").length > 0)
+                {
+                  if($("#mcp_employee_enable").val() == "1")
+                  {
+                      if($("#employee_id").length > 0)
+                      {
+                        $("#employee_id").show();
+                      }
+                      if($("#work_location").length > 0)
+                      {
+                        $("#work_location").show();
+                      
+                      }
+                  }
+                }
+            });
+
+    $(document).on("change",".changeDate",function()
+    {
+        let year = $(document).find("#year").val();
+        let month = $(document).find("#month").val();
+        let day = $(document).find("#day").val();
+        $(document).find("#birthdayFiller").val(year+"-"+month+"-"+day);
+    });
+
+    function showHideEmployee(obj)
+    {
+      if($("#employee_id").length > 0 && $("#work_location").length > 0)
+      {
+        if($(obj).val()=="Yes")
+        {
+          $("#employee_id").show();
+          $("#work_location").show();
+
+          $("#employee_id").find("input").attr("required","required");
+          $("#work_location").find("input").attr("required","required");
+
+        }
+        else
+        {
+          $("#employee_id").hide();
+          $("#work_location").hide();
+
+          $("#employee_id").find("input").removeAttr("required");
+          $("#work_location").find("input").removeAttr("required");
+        }
+      }
+    }
+
+    function checkSibling(obj)
+    {
+      if($.trim($(obj).val()) != "")
+      {
+        $(obj).siblings("span").removeClass("hidden");
+        $(obj).addClass("hidden");
+          var sibling_id = $(obj).val();
+          var labelid = $(obj).attr("name")+"_label";
+          $("."+labelid).removeClass("hidden");
+          var url = "{{url('/check/sibling/')}}/"+sibling_id;
+          $.ajax({
+            url:url,
+            method:'get',
+            success:function(response){
+                  
+
+                if($.trim(response) == "")
+                {
+                  if($(obj).attr("id") == "student_id")
+                  {
+                    alert("Invalid Student ID");
+                  }
+                  else
+                  {
+                    alert("Invalid Sibling ID");
+                    var labelid = $(obj).attr("name")+"_label";
+                    $("."+labelid).html("");
+                  }
+                  $(obj).val("");
+                  $(obj).focus();
+                  $(obj).removeClass("hidden");
+                  $(obj).siblings("span").addClass("hidden");
+
+
+                }
+                else
+                {
+                  $(obj).siblings("span").addClass("hidden");
+                  $(obj).removeClass("hidden");
+                  if($(obj).attr("id") != "student_id")
+                  {
+                    var labelid = $(obj).attr("name")+"_label";
+                    $("."+labelid).html(response);
+                    $("."+labelid).removeClass("hidden  ");
+                  }
+                }
+            }
+          });
+        }
+    }
+
+    function submitForm(event)
+    {
+      var txt;
+      var r = confirm("This will submit your application. Do you want to submit it?");
+      if (r == true) {
+        $("#programform").submit();
+      } 
+      else
+      {
+        event.preventDefault();
+      }
+    }
+</script>
+</body>
+</html>
