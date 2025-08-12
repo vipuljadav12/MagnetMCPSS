@@ -1,7 +1,7 @@
-@extends('layouts.admin.app')
-@section('title')Edit Eligibility Value  | {{config('APP_NAME',env("APP_NAME"))}}  @endsection
-@section('styles')
-    <script type="text/javascript">var BASE_URL = '{{url('/')}}';</script>
+
+<?php $__env->startSection('title'); ?>Edit Eligibility Value  | <?php echo e(config('APP_NAME',env("APP_NAME"))); ?>  <?php $__env->stopSection(); ?>
+<?php $__env->startSection('styles'); ?>
+    <script type="text/javascript">var BASE_URL = '<?php echo e(url('/')); ?>';</script>
     <style>
         input[type="checkbox"].styled-checkbox + label.label-xs {padding-left: 1.5rem;}
         .tooltip1 {
@@ -48,17 +48,18 @@
             border-color: transparent transparent black transparent;
         }
     </style>
-@endsection
-@section('content')
+<?php $__env->stopSection(); ?>
+<?php $__env->startSection('content'); ?>
     <div class="card shadow">
         <div class="card-body d-flex align-items-center justify-content-between flex-wrap">
             <div class="page-title mt-5 mb-5">Edit Eligibility Value</div>
-            <div class=""><a href="{{url('admin/SetEligibility')}}" class="btn btn-sm btn-secondary" title="Go Back">Go Back</a></div>
+            <div class=""><a href="<?php echo e(url('admin/SetEligibility')); ?>" class="btn btn-sm btn-secondary" title="Go Back">Go Back</a></div>
         </div>
     </div>
-    @include("layouts.admin.common.alerts")
-    <form action="{{url('admin/SetEligibility/update',$program->id)}}" method="post" name="" enctype= "multipart/form-data">
-        {{csrf_field()}}
+    <?php echo $__env->make("layouts.admin.common.alerts", array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+    <form action="<?php echo e(url('admin/SetEligibility/update',$program->id)); ?>" method="post" name="" enctype= "multipart/form-data">
+        <?php echo e(csrf_field()); ?>
+
         <ul class="nav nav-tabs" id="myTab" role="tablist">
             <li class="nav-item"><a class="nav-link active" id="general-tab" data-toggle="tab" href="#general" role="tab" aria-controls="general" aria-selected="true">General</a></li>
             <li class="nav-item"><a class="nav-link" id="eligibility-tab" data-toggle="tab" href="#eligibility" role="tab" aria-controls="eligibility" aria-selected="false">Eligibility</a></li>
@@ -77,46 +78,50 @@
                                     <div class="form-group">
                                         <label class="control-label">Program Name : </label>
                                         <div class="">
-                                            <input type="text" class="form-control" name="name" disabled="" value="{{$program->name}}">
+                                            <input type="text" class="form-control" name="name" disabled="" value="<?php echo e($program->name); ?>">
                                         </div>
-                                        @if($errors->first('name'))
+                                        <?php if($errors->first('name')): ?>
                                             <div class="mb-1 text-danger">
-                                                {{ $errors->first('name')}}
+                                                <?php echo e($errors->first('name')); ?>
+
                                             </div>
-                                        @endif
+                                        <?php endif; ?>
                                     </div>
                                     <div class="form-group">
                                         <label class="control-label">Applicant Group Filter 1 : </label>
                                         <div class="">
-                                            <input type="text" class="form-control" name="applicant_filter1" disabled="" value="{{$program->applicant_filter1}}">
+                                            <input type="text" class="form-control" name="applicant_filter1" disabled="" value="<?php echo e($program->applicant_filter1); ?>">
                                         </div>
-                                        @if($errors->first('applicant_filter1'))
+                                        <?php if($errors->first('applicant_filter1')): ?>
                                             <div class="mb-1 text-danger">
-                                                {{ $errors->first('applicant_filter1')}}
+                                                <?php echo e($errors->first('applicant_filter1')); ?>
+
                                             </div>
-                                        @endif
+                                        <?php endif; ?>
                                     </div>
                                     <div class="form-group">
                                         <label class="control-label">Applicant Group Filter 2 : </label>
                                         <div class="">
-                                            <input type="text" class="form-control" name="applicant_filter2" disabled="" value="{{$program->applicant_filter2}}">
+                                            <input type="text" class="form-control" name="applicant_filter2" disabled="" value="<?php echo e($program->applicant_filter2); ?>">
                                         </div>
-                                        @if($errors->first('applicant_filter2'))
+                                        <?php if($errors->first('applicant_filter2')): ?>
                                             <div class="mb-1 text-danger">
-                                                {{ $errors->first('applicant_filter2')}}
+                                                <?php echo e($errors->first('applicant_filter2')); ?>
+
                                             </div>
-                                        @endif
+                                        <?php endif; ?>
                                     </div>
                                     <div class="form-group">
                                         <label class="control-label">Applicant Group Filter 3 : </label>
                                         <div class="">
-                                            <input type="text" class="form-control" name="applicant_filter3" disabled="" value="{{$program->applicant_filter3}}">
+                                            <input type="text" class="form-control" name="applicant_filter3" disabled="" value="<?php echo e($program->applicant_filter3); ?>">
                                         </div>
-                                        @if($errors->first('applicant_filter3'))
+                                        <?php if($errors->first('applicant_filter3')): ?>
                                             <div class="mb-1 text-danger">
-                                                {{ $errors->first('applicant_filter3')}}
+                                                <?php echo e($errors->first('applicant_filter3')); ?>
+
                                             </div>
-                                        @endif
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                                 <div class="col-12 col-lg-6">
@@ -124,59 +129,59 @@
                                         <label class="control-label"><strong>Available Grade Level (Check all that apply) :</strong> </label>
                                         <div class="row flex-wrap program_grade">
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" class="custom-control-input" disabled="" id="table25" name="grade_lavel[]" value="PreK" {{in_array('PreK',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" class="custom-control-input" disabled="" id="table25" name="grade_lavel[]" value="PreK" <?php echo e(in_array('PreK',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table25" class="custom-control-label">PreK</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="K" class="custom-control-input" disabled="" id="table06" {{in_array('K',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="K" class="custom-control-input" disabled="" id="table06" <?php echo e(in_array('K',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table06" class="custom-control-label">K</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="1" class="custom-control-input" disabled="" id="table07" {{in_array('1',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="1" class="custom-control-input" disabled="" id="table07" <?php echo e(in_array('1',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table07" class="custom-control-label">1</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="2" class="custom-control-input" disabled="" id="table08" {{in_array('2',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="2" class="custom-control-input" disabled="" id="table08" <?php echo e(in_array('2',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table08" class="custom-control-label">2</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="3" class="custom-control-input" disabled="" id="table09" {{in_array('3',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="3" class="custom-control-input" disabled="" id="table09" <?php echo e(in_array('3',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table09" class="custom-control-label">3</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="4" class="custom-control-input" disabled="" id="table10" {{in_array('4',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="4" class="custom-control-input" disabled="" id="table10" <?php echo e(in_array('4',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table10" class="custom-control-label">4</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="5" class="custom-control-input" disabled="" id="table11" {{in_array('5',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="5" class="custom-control-input" disabled="" id="table11" <?php echo e(in_array('5',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table11" class="custom-control-label">5</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="6" class="custom-control-input" disabled="" id="table12" {{in_array('6',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="6" class="custom-control-input" disabled="" id="table12" <?php echo e(in_array('6',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table12" class="custom-control-label">6</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="7" class="custom-control-input" disabled="" id="table13" {{in_array('7',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="7" class="custom-control-input" disabled="" id="table13" <?php echo e(in_array('7',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table13" class="custom-control-label">7</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="8" class="custom-control-input" disabled="" id="table14" {{in_array('8',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="8" class="custom-control-input" disabled="" id="table14" <?php echo e(in_array('8',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table14" class="custom-control-label">8</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="9" class="custom-control-input" disabled="" id="table15" {{in_array('9',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="9" class="custom-control-input" disabled="" id="table15" <?php echo e(in_array('9',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table15" class="custom-control-label">9</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="10" class="custom-control-input" disabled="" id="table16" {{in_array('10',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="10" class="custom-control-input" disabled="" id="table16" <?php echo e(in_array('10',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table16" class="custom-control-label">10</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="11" class="custom-control-input" disabled="" id="table17" {{in_array('11',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]" value="11" class="custom-control-input" disabled="" id="table17" <?php echo e(in_array('11',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table17" class="custom-control-label">11</label></div>
                                             </div>
                                             <div class="col-12 col-sm-4 col-lg-2">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]"value="12" class="custom-control-input" disabled="" id="table18" {{in_array('12',explode(',',$program->grade_lavel))?'checked':''}}> 
+                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="grade_lavel[]"value="12" class="custom-control-input" disabled="" id="table18" <?php echo e(in_array('12',explode(',',$program->grade_lavel))?'checked':''); ?>> 
                                                     <label for="table18" class="custom-control-label">12</label></div>
                                             </div>
                                         </div>
@@ -185,29 +190,29 @@
                                         <label class="control-label"><strong>Parent Submission Form :</strong> </label>
                                         <div class="">
                                             <select class="form-control custom-select" disabled="">
-                                                <option>{{findFormName($program->parent_submission_form)}}</option>
+                                                <option><?php echo e(findFormName($program->parent_submission_form)); ?></option>
                                             </select>
                                         </div>
                                     </div>
 
                                      <div class="form-group d-flex justify-content-between">
                                         <label for="" class="control-label">Sibling Enabled : </label>
-                                        <div class=""><input id="chk_100" type="checkbox" class="js-switch js-switch-1 js-switch-xs" data-size="Small" name="sibling_enabled"  {{$program->sibling_enabled=='Y'?'checked':''}}  disabled /></div>
+                                        <div class=""><input id="chk_100" type="checkbox" class="js-switch js-switch-1 js-switch-xs" data-size="Small" name="sibling_enabled"  <?php echo e($program->sibling_enabled=='Y'?'checked':''); ?>  disabled /></div>
                                     </div>
-                                    <div class="form-group d-flex justify-content-between @if($program->sibling_enabled == "N") d-none @endif" id="sibling_check">
+                                    <div class="form-group d-flex justify-content-between <?php if($program->sibling_enabled == "N"): ?> d-none <?php endif; ?>" id="sibling_check">
                                         <label for="" class="control-label">Sibling Program Check : </label>
-                                        <div class=""><input id="chk_03" type="checkbox" class="js-switch js-switch-1 js-switch-xs" data-size="Small" name="silbling_check"  {{$program->silbling_check=='Y'?'checked':''}} disabled /></div>
+                                        <div class=""><input id="chk_03" type="checkbox" class="js-switch js-switch-1 js-switch-xs" data-size="Small" name="silbling_check"  <?php echo e($program->silbling_check=='Y'?'checked':''); ?> disabled /></div>
                                     </div>
 
                                     <div class="form-group d-flex justify-content-between">
                                         <label for="" class="control-label">Existing Program Check : </label>
-                                        <div class=""><input id="chk_03" type="checkbox" class="js-switch js-switch-1 js-switch-xs" data-size="Small" name="existing_magnet_program_alert"  {{$program->existing_magnet_program_alert=='Y'?'checked':''}} disabled /></div>
+                                        <div class=""><input id="chk_03" type="checkbox" class="js-switch js-switch-1 js-switch-xs" data-size="Small" name="existing_magnet_program_alert"  <?php echo e($program->existing_magnet_program_alert=='Y'?'checked':''); ?> disabled /></div>
                                     </div>
                                     <div class="form-group">
                                         <label class="control-label"><strong>Select School :</strong> </label>
                                         <div class="">
                                             <select class="form-control custom-select" disabled>
-                                                <option>{{$program->magnet_school}}</option>
+                                                <option><?php echo e($program->magnet_school); ?></option>
                                             </select>
                                         </div>
                                     </div>
@@ -227,29 +232,18 @@
                                         <label class="control-label"><strong>Select Priority :</strong> </label>
                                         <div class="d-flex flex-wrap">
                                             <div class="mr-20 w-90">
-                                                <div class="custom-control custom-radio"><input type="radio" name="priority[]" value="none" class="custom-control-input" disabled="" id="table28" {{in_array('none',explode(',',$program->priority))?'checked':''}}> 
+                                                <div class="custom-control custom-radio"><input type="radio" name="priority[]" value="none" class="custom-control-input" disabled="" id="table28" <?php echo e(in_array('none',explode(',',$program->priority))?'checked':''); ?>> 
                                                     <label for="table28" class="custom-control-label">None</label></div>
                                             </div>
-                                            @forelse($priorities as $p=>$priority)
+                                            <?php $__empty_1 = true; $__currentLoopData = $priorities; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $p=>$priority): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                                                 <div class="mr-20 w-90">
                                                     <div class="custom-control custom-radio">
-                                                        <input type="radio" name="priority[]" value="{{$priority->id}}" class="custom-control-input" disabled="" id="priority{{$p}}" {{in_array($priority->id,explode(',',$program->priority))?'checked':''}}> 
-                                                        <label for="priority{{$p}}" class="custom-control-label">{{$priority->name}}</label></div>
+                                                        <input type="radio" name="priority[]" value="<?php echo e($priority->id); ?>" class="custom-control-input" disabled="" id="priority<?php echo e($p); ?>" <?php echo e(in_array($priority->id,explode(',',$program->priority))?'checked':''); ?>> 
+                                                        <label for="priority<?php echo e($p); ?>" class="custom-control-label"><?php echo e($priority->name); ?></label></div>
                                                 </div>
-                                            @empty
-                                            @endforelse
-                                            {{-- <div class="mr-20 w-90">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="priority[]" value="1" class="custom-control-input" disabled="" id="table29" {{in_array('1',explode(',',$program->priority))?'checked':''}}>
-                                                    <label for="table29" class="custom-control-label">1</label></div>
-                                            </div>
-                                            <div class="mr-20 w-90">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="priority[]" value="2" class="custom-control-input" disabled="" id="table30" {{in_array('2',explode(',',$program->priority))?'checked':''}}>
-                                                    <label for="table30" class="custom-control-label">2</label></div>
-                                            </div>
-                                            <div class="mr-20 w-90">
-                                                <div class="custom-control custom-checkbox"><input type="checkbox" name="priority[]" value="3" class="custom-control-input" disabled="" id="table31" {{in_array('3',explode(',',$program->priority))?'checked':''}}>
-                                                    <label for="table31" class="custom-control-label">3</label></div>
-                                            </div> --}}
+                                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                                            <?php endif; ?>
+                                            
                                         </div>
                                     </div>
                                 </div>
@@ -259,10 +253,10 @@
                 </div>
             </div>
             <div class="tab-pane fade" id="eligibility" role="tabpanel" aria-labelledby="eligibility-tab">
-                @include("SetEligibility::eligibility_edit")
+                <?php echo $__env->make("SetEligibility::eligibility_edit", array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
             </div>
             <div class="tab-pane fade" id="process" role="tabpanel" aria-labelledby="process-tab">
-                @include("SetEligibility::selection")
+                <?php echo $__env->make("SetEligibility::selection", array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
             </div>
            
         </div>
@@ -270,20 +264,19 @@
         <div class="box content-header-floating" id="listFoot">
             <div class="row">
                 <div class="col-lg-12 text-right hidden-xs float-right">
-                   {{--  <button type="submit" class="btn btn-warning btn-xs"><i class="fa fa-save"></i> Save </button>
-                    <button type="submit" class="btn btn-success btn-xs" name="save_edit" value="save_edit"><i class="fa fa-save"></i> Save &amp; Edit</button> --}}
+                   
                     <button type="submit" class="btn btn-warning btn-xs" name="submit" value="Save"><i class="fa fa-save"></i> Save </button>
                    <button type="submit" name="save_exit" value="save_exit" class="btn btn-success btn-xs submit"><i class="fa fa-save"></i> Save &amp; Exit</button>
-                   <a class="btn btn-danger btn-xs" href="{{url('/admin/SetEligibility')}}"><i class="fa fa-times"></i> Cancel</a>
-                    {{-- <a class="btn btn-danger btn-xs" onclick="deletefunction({{$program->id}})" href="javascript:void(0)"><i class="fa fa-trash"></i> Delete</a> --}}
+                   <a class="btn btn-danger btn-xs" href="<?php echo e(url('/admin/SetEligibility')); ?>"><i class="fa fa-times"></i> Cancel</a>
+                    
                 </div>
             </div>
         </div>
         
 
-            @include("Program::Template.eligibility_modal_grade")
-            @forelse($eligibilities as $key=>$eligibility)
-            @if($eligibility['name']=='Recommendation Form111')
+            <?php echo $__env->make("Program::Template.eligibility_modal_grade", array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+            <?php $__empty_1 = true; $__currentLoopData = $eligibilities; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $key=>$eligibility): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+            <?php if($eligibility['name']=='Recommendation Form111'): ?>
                 <div class="modal fade" id="modal_4" tabindex="-1" role="dialog" aria-labelledby="modal_4Label" aria-hidden="true">
                     <div class="modal-dialog modal-lg" role="document">
                         <div class="modal-content">
@@ -317,7 +310,7 @@
                                             <div class="form-group">
                                                 <label class="control-label">Select Prior Developed Recommendation Form: : </label>
                                                 <div class="">
-                                                    <select class="form-control custom-select" name="eligibility_grade_lavel[{{$eligibility['id']}}][]">
+                                                    <select class="form-control custom-select" name="eligibility_grade_lavel[<?php echo e($eligibility['id']); ?>][]">
                                                         <option value="HCS STEM Teacher Recommendation">HCS STEM Teacher Recommendation</option>
                                                         <option value="HCS Principal Recommendation">HCS Principal Recommendation</option>
                                                     </select>
@@ -334,10 +327,10 @@
                         </div>
                     </div>
                 </div>
-            @endif
+            <?php endif; ?>
 
-        @empty
-        @endforelse
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+        <?php endif; ?>
         
 
     </form>
@@ -354,17 +347,17 @@
             
           </div>
           <div class="modal-footer">
-            <button type="button" id="extraValueFormBtn" {{-- form="extraValueForm" --}} class="btn btn-success extraValueFormBtn">Save</button>
+            <button type="button" id="extraValueFormBtn"  class="btn btn-success extraValueFormBtn">Save</button>
             <!--<button type="button" class="btn btn-secondary modalDismiss" data-dismiss="modal">Close</button>-->
           </div>
         </div>
       </div>
     </div>
-@endsection
-@section('scripts')
-    <script src="{{asset('resources/assets/admin/js/jquery.validate.min.js')}}"></script>
-    <script src="{{asset('resources/assets/admin/js/additional-methods.min.js')}}"></script>
-    <script type="text/javascript" src="{{asset('resources/assets/admin/plugins/jquery-ui/jquery-ui.min.js')}}"></script>
+<?php $__env->stopSection(); ?>
+<?php $__env->startSection('scripts'); ?>
+    <script src="<?php echo e(asset('resources/assets/admin/js/jquery.validate.min.js')); ?>"></script>
+    <script src="<?php echo e(asset('resources/assets/admin/js/additional-methods.min.js')); ?>"></script>
+    <script type="text/javascript" src="<?php echo e(asset('resources/assets/admin/plugins/jquery-ui/jquery-ui.min.js')); ?>"></script>
     <script type="text/javascript">
         //44 for seteligibility script start
         $(document).on("change",".valueRequiredSelect",function()
@@ -401,7 +394,7 @@
             var program_id  = element.attr("data-program-id");
             var eligibility_id  = element.attr("data-eligibility-id");
             $.ajax({
-                url:"{{url('admin/SetEligibility/extra_values')}}",
+                url:"<?php echo e(url('admin/SetEligibility/extra_values')); ?>",
                 data:{
                     eligibility_type:eligibility_type,
                     program_id:program_id,
@@ -422,7 +415,7 @@
             var formData = $('#extraValueForm').serialize();
             // alert();
             $.ajax({
-                url:"{{url('admin/SetEligibility/extra_values/save')}}",
+                url:"<?php echo e(url('admin/SetEligibility/extra_values/save')); ?>",
                 data:formData,
                 method:"post",
                 success:function(result)
@@ -430,7 +423,7 @@
                     $('#exampleModal').modal('hide');
                 }
             });
-            {{-- $("#extraValueForm").ajaxForm({url: '{{url('admin/SetEligibility/extra_values/save')}}', type: 'post'}) --}}
+            
             // $(document).find("#extraValueForm").submit();
         });
         //44 for seteligibility script End
@@ -488,7 +481,7 @@
 
         function changeApplication(value)
         {
-            document.location.href = "{{url('/admin/SetEligibility/edit/'.$program->id)}}/"+value;
+            document.location.href = "<?php echo e(url('/admin/SetEligibility/edit/'.$program->id)); ?>/"+value;
         }
         //});
     </script>
@@ -836,15 +829,17 @@
                 confirmButtonText: "Yes",
                 closeOnConfirm: false
             }).then(function() {
-                window.location.href = '{{url('/')}}/admin/SetEligibility/delete/'+id;
+                window.location.href = '<?php echo e(url('/')); ?>/admin/SetEligibility/delete/'+id;
             });
         };*/
     </script>
-    <script src="{{asset('resources/assets/admin/js/program_eligibility.js?'.rand())}}"></script>
+    <script src="<?php echo e(asset('resources/assets/admin/js/program_eligibility.js?'.rand())); ?>"></script>
     <script type="text/javascript">
         $(".table-striped").find("tr").each(function() {
             changeIcon($(this), 1);    
         })
         
     </script>
-@endsection
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.admin.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\vipuljadav\www\projects\laravel\MagnetMCPSS\app/Modules/SetEligibility/Views/edit.blade.php ENDPATH**/ ?>

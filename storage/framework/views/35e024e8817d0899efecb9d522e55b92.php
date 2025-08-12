@@ -217,9 +217,10 @@
                             <i class="far fa-calendar-alt"></i><span>New Enrollment Period</span></a></li>
                 <?php endif; ?>
                 <?php if(checkPermission(Auth::user()->role_id, 'Application') == 1): ?>
-                    <li class="<?php echo e(Request::is('admin/Application*') ? 'mm-active' : ''); ?>"
-                        class="<?php echo e(Request::is('admin/Application*') ? 'active' : ''); ?>"><a title="Setup Application"
-                            href="<?php echo e(url('/admin/Application')); ?>"><i class="far fa-file-alt"></i>
+                    <li class="<?php echo e(Request::is('admin/Application*') ? 'mm-active' : ''); ?>"><a title="Setup Application"
+                            href="<?php echo e(url('/admin/Application')); ?>"
+                            class="<?php echo e(Request::is('admin/Application*') ? 'active' : ''); ?>"><i
+                                class="far fa-file-alt"></i>
                             <span>Setup Application</span></a></li>
                 <?php endif; ?>
                 <?php if(checkPermission(Auth::user()->role_id, 'SetEligibility') == 1): ?>
@@ -421,9 +422,9 @@
                                     title="Audit Trails" href="<?php echo e(url('/admin/AuditTrailData')); ?>"
                                     class="<?php echo e(Request::is('admin/AuditTrailData*') ? 'active' : ''); ?>"><span>Audit
                                         Trail</span></a></li>
-                            <li class="<?php echo e(Request::is('admin/DistrictConfiguration*') ? 'mm-active' : ''); ?>"><a
+                            <li class="<?php echo e(Request::is('admin/DistrictConfiguration') ? 'mm-active' : ''); ?>"><a
                                     title="Welcome Texts" href="<?php echo e(url('/admin/DistrictConfiguration')); ?>"
-                                    class="<?php echo e(Request::is('admin/DistrictConfiguration*') ? 'active' : ''); ?>"><span>District
+                                    class="<?php echo e(Request::is('admin/DistrictConfiguration') ? 'active' : ''); ?>"><span>District
                                         Configuration</span></a></li>
                             <li class="<?php echo e(Request::is('admin/ZonedSchool/overrideAddress*') ? 'mm-active' : ''); ?>"><a
                                     title="Address Override" href="<?php echo e(url('/admin/ZonedSchool/overrideAddress')); ?>"

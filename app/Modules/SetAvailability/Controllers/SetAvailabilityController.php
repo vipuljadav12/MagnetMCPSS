@@ -7,8 +7,9 @@ use App\Http\Controllers\Controller;
 use App\Modules\Program\Models\Program;
 use App\Modules\SetAvailability\Models\Availability;
 use App\Modules\Enrollment\Models\Enrollment;
+use App\Modules\ProcessSelection\Models\ProcessSelection;
 use App\Modules\Submissions\Models\SubmissionsStatusUniqueLog;
-use Session;
+use Illuminate\Support\Facades\Session;
 
 class SetAvailabilityController extends Controller
 {
@@ -38,8 +39,7 @@ class SetAvailabilityController extends Controller
      */
     public function getOptionsByProgram(Program $program)
     {
-        // return $program;
-        // return
+        // $display_outcome = ProcessSelection::where('enrollment_id', Session::get("enrollment_id"))->where('form_id', $program->parent_submission_form)->where('commited', 'Yes')->count();
         $display_outcome = SubmissionsStatusUniqueLog::where("enrollment_id", Session::get("enrollment_id"))->count();
 
         $availabilities =  Availability::where("program_id",$program->id)->where('district_id',$program->district_id)->where('enrollment_id',$program->enrollment_id)->get()->keyBy('grade');

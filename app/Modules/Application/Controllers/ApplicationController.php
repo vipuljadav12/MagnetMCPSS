@@ -12,9 +12,9 @@ use App\Modules\Application\Models\Application;
 use App\Modules\Application\Models\ApplicationProgram;
 use App\Modules\Application\Models\ApplicationConfiguration;
 use App\Modules\District\Models\District;
-use Session;
 use App\Traits\AuditTrail;
 use App\Modules\Submissions\Models\{Submissions,SubmissionsStatusUniqueLog};
+use Illuminate\Support\Facades\Session;
 
 class ApplicationController extends Controller
 {
@@ -453,9 +453,20 @@ class ApplicationController extends Controller
 
     public function start_end_date(Request $request)
     {
-        $enrollment=Enrollment::where('id',$request->id)->first();
-        return response()->json(['start'=>$enrollment->begning_date,'end'=>$enrollment->ending_date]);
-        # code...
+        try {
+            $enrollment = Enrollment::where('id', $request->id)->first();
+            
+            if (!$enrollment) {
+                return response()->json(['error' => 'Enrollment not found'], 404);
+            }
+            
+            return response()->json([
+                'start' => $enrollment->begning_date, 
+                'end' => $enrollment->ending_date
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Server error'], 500);
+        }
     }
     public function status(Request $request)
     {

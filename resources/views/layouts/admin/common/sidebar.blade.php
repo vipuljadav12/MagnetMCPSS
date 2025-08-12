@@ -217,9 +217,10 @@
                             <i class="far fa-calendar-alt"></i><span>New Enrollment Period</span></a></li>
                 @endif
                 @if (checkPermission(Auth::user()->role_id, 'Application') == 1)
-                    <li class="{{ Request::is('admin/Application*') ? 'mm-active' : '' }}"
-                        class="{{ Request::is('admin/Application*') ? 'active' : '' }}"><a title="Setup Application"
-                            href="{{ url('/admin/Application') }}"><i class="far fa-file-alt"></i>
+                    <li class="{{ Request::is('admin/Application*') ? 'mm-active' : '' }}"><a title="Setup Application"
+                            href="{{ url('/admin/Application') }}"
+                            class="{{ Request::is('admin/Application*') ? 'active' : '' }}"><i
+                                class="far fa-file-alt"></i>
                             <span>Setup Application</span></a></li>
                 @endif
                 @if (checkPermission(Auth::user()->role_id, 'SetEligibility') == 1)
@@ -421,9 +422,9 @@
                                     title="Audit Trails" href="{{ url('/admin/AuditTrailData') }}"
                                     class="{{ Request::is('admin/AuditTrailData*') ? 'active' : '' }}"><span>Audit
                                         Trail</span></a></li>
-                            <li class="{{ Request::is('admin/DistrictConfiguration*') ? 'mm-active' : '' }}"><a
+                            <li class="{{ Request::is('admin/DistrictConfiguration') ? 'mm-active' : '' }}"><a
                                     title="Welcome Texts" href="{{ url('/admin/DistrictConfiguration') }}"
-                                    class="{{ Request::is('admin/DistrictConfiguration*') ? 'active' : '' }}"><span>District
+                                    class="{{ Request::is('admin/DistrictConfiguration') ? 'active' : '' }}"><span>District
                                         Configuration</span></a></li>
                             <li class="{{ Request::is('admin/ZonedSchool/overrideAddress*') ? 'mm-active' : '' }}"><a
                                     title="Address Override" href="{{ url('/admin/ZonedSchool/overrideAddress') }}"
