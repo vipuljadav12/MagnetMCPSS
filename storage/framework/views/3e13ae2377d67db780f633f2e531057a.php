@@ -111,7 +111,6 @@ $(document).on('keydown','.numbersOnly',function(e){
     }else if (e.keyCode === 189  && this.value.split('-').length === 2) {
         return false;
     }else{
-        // console.log(e.keyCode);
         if ($.inArray(e.keyCode, [8, 9, 27, 13, 189, 110 ,109]) !== -1 ||
             (e.keyCode === 65 && (e.ctrlKey === true || e.metaKey === true)) || 
             (e.keyCode >= 35 && e.keyCode <= 40))  {

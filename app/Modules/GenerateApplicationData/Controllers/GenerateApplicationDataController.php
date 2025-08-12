@@ -83,7 +83,7 @@ class GenerateApplicationDataController extends Controller
 
     public function generateData(Request $request)
     {
-        //return $request->all();
+        set_time_limit(300); 
         $first_program_id = $request['first_program'];
         $second_program_id = $request['second_program'];
         $enrollment_id = $request['enrollment'];
@@ -250,7 +250,7 @@ class GenerateApplicationDataController extends Controller
         view()->share('terms', $terms);
         view()->share("application_data", $application_data);
 
-        $pdf = PDF::loadView('GenerateApplicationData::pdfview', ['student_data', 'terms', 'subjects', 'application_data']);
+        $pdf = Pdf::loadView('GenerateApplicationData::pdfview', ['student_data', 'terms', 'subjects', 'application_data']);
 
         $path = "resources/assets/admin/application_data";
         $fileName =  "ApplicationData-" . strtotime(date("Y-m-d H:i:s")) . '.' . 'pdf';
