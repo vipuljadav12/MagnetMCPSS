@@ -49,11 +49,11 @@
 <?php $__env->stopSection(); ?>
 <?php $__env->startSection('scripts'); ?>
     
-    <script src="<?php echo e(asset('resources/assets/common/js/jquery.validate.min.js')); ?>"></script>
-    <script src="<?php echo e(asset('resources/assets/common/js/additional-methods.min.js')); ?>"></script>
+    <script src="<?php echo e(asset('resources/assets/admin/js/jquery.validate.min.js')); ?>"></script>
+    <script src="<?php echo e(asset('resources/assets/admin/js/additional-methods.min.js')); ?>"></script>
     <!-- Sweet Alert -->
-    <script src="<?php echo e(url('/resources/assets/plugins/sweet-alert2/sweetalert2.min.js')); ?>"></script>
-    <script src="<?php echo e(url('/resources/assets/plugins/sweet-alert2/jquery.sweet-alert.init.js')); ?>"></script>
+    <script src="<?php echo e(url('/resources/assets/admin/plugins/sweet-alert2/sweetalert2.min.js')); ?>"></script>
+    
     <script type="text/javascript">
         $(document).ready(function() {
             $(".alert").delay(2000).fadeOut(1000);

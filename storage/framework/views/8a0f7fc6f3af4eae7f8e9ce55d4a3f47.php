@@ -1,18 +1,17 @@
-@extends('layouts.admin.app')
-@section('title') School Master @endsection
-@section('content')
+<?php $__env->startSection('title'); ?> School Master <?php $__env->stopSection(); ?>
+<?php $__env->startSection('content'); ?>
 <div class="card shadow">
     <div class="card-body d-flex align-items-center justify-content-between flex-wrap">
         <div class="page-title mt-5 mb-5">School Master</div>
         <div class="">
-            <a href="{{url('admin/School/create')}}" class="btn btn-sm btn-secondary" title="">Add School</a>
-            <a href="{{url('admin/School/trash')}}" class="btn btn-sm btn-danger" title="">Trash</a>
+            <a href="<?php echo e(url('admin/School/create')); ?>" class="btn btn-sm btn-secondary" title="">Add School</a>
+            <a href="<?php echo e(url('admin/School/trash')); ?>" class="btn btn-sm btn-danger" title="">Trash</a>
 
         </div>
     </div>
 </div>
 <div class="card shadow">
-   @include("layouts.admin.common.alerts")
+   <?php echo $__env->make("layouts.admin.common.alerts", array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
    <div class="card-body">
     <div class="table-responsive">
         <table id="datatable" class="table table-bordered">
@@ -28,37 +27,37 @@
                 </tr>
             </thead>
             <tbody>
-             @if(isset($schools))
-             @foreach($schools as $key=>$school)
+             <?php if(isset($schools)): ?>
+             <?php $__currentLoopData = $schools; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $key=>$school): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
              <tr>
-                <td class="">{{$school->name}}</td>
-                <td class="">{{$school->grade_id}}</td>
-                <td class="">{{$school->magnet}}</td>
-                <td class="">{{$school->zoning_api_name}}</td>
-                <td class="">{{$school->sis_name}}</td>
+                <td class=""><?php echo e($school->name); ?></td>
+                <td class=""><?php echo e($school->grade_id); ?></td>
+                <td class=""><?php echo e($school->magnet); ?></td>
+                <td class=""><?php echo e($school->zoning_api_name); ?></td>
+                <td class=""><?php echo e($school->sis_name); ?></td>
                 <td class="text-center">
-                    <input id="{{$school->id}}" type="checkbox" class=" status js-switch js-switch-1 js-switch-xs" data-size="Small" {{isset($school->status)&&$school->status=='Y'?'checked':''}} />
+                    <input id="<?php echo e($school->id); ?>" type="checkbox" class=" status js-switch js-switch-1 js-switch-xs" data-size="Small" <?php echo e(isset($school->status)&&$school->status=='Y'?'checked':''); ?> />
                 </td>
                 <td class="text-center">
-                    <a href="{{url('admin/School/edit',$school->id)}}" class="font-18 ml-5 mr-5" title="Edit"><i class="far fa-edit"></i>
+                    <a href="<?php echo e(url('admin/School/edit',$school->id)); ?>" class="font-18 ml-5 mr-5" title="Edit"><i class="far fa-edit"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="deletefunction({{$school->id}})" class="font-18 ml-5 mr-5 text-danger" title=""><i class="far fa-trash-alt"></i>
+                    <a href="javascript:void(0);" onclick="deletefunction(<?php echo e($school->id); ?>)" class="font-18 ml-5 mr-5 text-danger" title=""><i class="far fa-trash-alt"></i>
                     </a>
                 </td>
             </tr>
-            @endforeach
-            @endif
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            <?php endif; ?>
         </tbody>
     </table>
 </div>
 </div>
 </div>
 
-@endsection
-@section('scripts')
+<?php $__env->stopSection(); ?>
+<?php $__env->startSection('scripts'); ?>
 <!-- Sweet Alert -->
-<script src="{{url('/resources/assets/admin/plugins/sweet-alert2/sweetalert2.min.js')}}"></script>
-{{-- <script src="{{url('/resources/assets/admin/plugins/sweet-alert2/jquery.sweet-alert.init.js')}}"></script> --}}
+<script src="<?php echo e(url('/resources/assets/plugins/sweet-alert2/sweetalert2.min.js')); ?>"></script>
+<script src="<?php echo e(url('/resources/assets/plugins/sweet-alert2/jquery.sweet-alert.init.js')); ?>"></script>
 <script type="text/javascript">
     $(document).ready(function(){
         $(".alert").delay(2000).fadeOut(1000);
@@ -80,7 +79,7 @@
         var status=$(this).prop('checked')==true ? 'Y' : 'N' ;
         $.ajax({
             type: "get",
-            url: '{{url('admin/School/changestatus')}}',
+            url: '<?php echo e(url('admin/School/changestatus')); ?>',
             data: {
                 id:$(this).attr('id'),
                 status:status
@@ -101,8 +100,9 @@
                 confirmButtonText: "Yes",
                 closeOnConfirm: false
             }).then(function() {
-                window.location.href = '{{url('/')}}/admin/School/delete/'+id;
+                window.location.href = '<?php echo e(url('/')); ?>/admin/School/delete/'+id;
             });
         };
     </script> 
-    @endsection
+    <?php $__env->stopSection(); ?>
+<?php echo $__env->make('layouts.admin.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\vipuljadav\www\projects\laravel\MagnetMCPSS\app/Modules/School/Views/index.blade.php ENDPATH**/ ?>
