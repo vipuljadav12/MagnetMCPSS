@@ -1,27 +1,28 @@
-@extends('layouts.admin.app')
 
-@section('title', 'Edit Enrollment Period')
 
-@section('styles')
-    <link rel="stylesheet" href="{{ url('/resources/assets/admin/css/jquery-ui.css?rand()') }}">
+<?php $__env->startSection('title', 'Edit Enrollment Period'); ?>
+
+<?php $__env->startSection('styles'); ?>
+    <link rel="stylesheet" href="<?php echo e(url('/resources/assets/admin/css/jquery-ui.css?rand()')); ?>">
     <style type="text/css">
         .error {
             color: red;
         }
     </style>
-@stop
+<?php $__env->stopSection(); ?>
 
-@section('content')
+<?php $__env->startSection('content'); ?>
     <div class="card shadow">
         <div class="card-body d-flex align-items-center justify-content-between flex-wrap">
             <div class="page-title mt-5 mb-5">Edit Enrollment Period</div>
-            <div class=""><a href="{{ url('admin/Enrollment') }}" class="btn btn-sm btn-secondary" title="">Go
+            <div class=""><a href="<?php echo e(url('admin/Enrollment')); ?>" class="btn btn-sm btn-secondary" title="">Go
                     Back</a></div>
         </div>
     </div>
-    @include('layouts.admin.common.alerts')
-    <form id="edit-enrollment" method="post" action="{{ url('admin/Enrollment/update/' . $enrollment->id) }}">
-        {{ csrf_field() }}
+    <?php echo $__env->make('layouts.admin.common.alerts', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+    <form id="edit-enrollment" method="post" action="<?php echo e(url('admin/Enrollment/update/' . $enrollment->id)); ?>">
+        <?php echo e(csrf_field()); ?>
+
         <div class="card shadow">
             <div class="card-header">Open Enrollment</div>
             <div class="card-body">
@@ -30,13 +31,14 @@
                         <div class="form-group">
                             <label for="">School Year*</label>
                             <div class="">
-                                <input name="school_year" value="{{ $enrollment->school_year }}" type="text"
+                                <input name="school_year" value="<?php echo e($enrollment->school_year); ?>" type="text"
                                     maxlength="10" class="form-control">
-                                @if ($errors->has('school_year'))
+                                <?php if($errors->has('school_year')): ?>
                                     <span class="error">
-                                        {{ $errors->first('school_year') }}
+                                        <?php echo e($errors->first('school_year')); ?>
+
                                     </span>
-                                @endif
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -44,13 +46,14 @@
                         <div class="form-group">
                             <label for="">Confirmation Style*</label>
                             <div class="">
-                                <input name="confirmation_style" value="{{ $enrollment->confirmation_style }}"
+                                <input name="confirmation_style" value="<?php echo e($enrollment->confirmation_style); ?>"
                                     type="text" maxlength="30" class="form-control">
-                                @if ($errors->has('confirmation_style'))
+                                <?php if($errors->has('confirmation_style')): ?>
                                     <span class="error">
-                                        {{ $errors->first('confirmation_style') }}
+                                        <?php echo e($errors->first('confirmation_style')); ?>
+
                                     </span>
-                                @endif
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -60,15 +63,16 @@
                             <div class="">
                                 <select name="import_grades_by" class="form-control custom-select">
                                     <option value="">Select</option>
-                                    <option value="submission_date" @if ($enrollment->import_grades_by == 'SD') selected @endif>
+                                    <option value="submission_date" <?php if($enrollment->import_grades_by == 'SD'): ?> selected <?php endif; ?>>
                                         Submission Date
                                     </option>
                                 </select>
-                                @if ($errors->has('import_grades_by'))
+                                <?php if($errors->has('import_grades_by')): ?>
                                     <span class="error">
-                                        {{ $errors->first('import_grades_by') }}
+                                        <?php echo e($errors->first('import_grades_by')); ?>
+
                                     </span>
-                                @endif
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -76,13 +80,14 @@
                         <div class="form-group">
                             <label for="">Beginning Date (1st day of open enrollment period)*</label>
                             <div class="">
-                                <input name="begning_date" value="{{ date('m/d/Y', strtotime($enrollment->begning_date)) }}"
+                                <input name="begning_date" value="<?php echo e(date('m/d/Y', strtotime($enrollment->begning_date))); ?>"
                                     class="form-control" id="begning_date">
-                                @if ($errors->has('begning_date'))
+                                <?php if($errors->has('begning_date')): ?>
                                     <span class="error">
-                                        {{ $errors->first('begning_date') }}
+                                        <?php echo e($errors->first('begning_date')); ?>
+
                                     </span>
-                                @endif
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -91,13 +96,14 @@
                             <label for="">Ending Date (last day of open enrollment period ending at 11:59
                                 PM)*</label>
                             <div class="">
-                                <input name="ending_date" value="{{ date('m/d/Y', strtotime($enrollment->ending_date)) }}"
+                                <input name="ending_date" value="<?php echo e(date('m/d/Y', strtotime($enrollment->ending_date))); ?>"
                                     class="form-control" id="ending_date">
-                                @if ($errors->has('ending_date'))
+                                <?php if($errors->has('ending_date')): ?>
                                     <span class="error">
-                                        {{ $errors->first('ending_date') }}
+                                        <?php echo e($errors->first('ending_date')); ?>
+
                                     </span>
-                                @endif
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -131,15 +137,16 @@
                             <label for="">PreK Birthday Cut Off*</label>
                             <div class="">
                                 <input name="perk_birthday_cut_off"
-                                    value="{{ date('m/d/Y', strtotime($enrollment->perk_birthday_cut_off)) }}"
+                                    value="<?php echo e(date('m/d/Y', strtotime($enrollment->perk_birthday_cut_off))); ?>"
                                     class="form-control" id="perk_birthday_cut_off">
                                 <small>After this date, submissions applying for Pre Kindergarten will not be
                                     accepted.</small> <br>
-                                @if ($errors->has('perk_birthday_cut_off'))
+                                <?php if($errors->has('perk_birthday_cut_off')): ?>
                                     <span class="error">
-                                        {{ $errors->first('perk_birthday_cut_off') }}
+                                        <?php echo e($errors->first('perk_birthday_cut_off')); ?>
+
                                     </span>
-                                @endif
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -148,15 +155,16 @@
                             <label for="">Kindergarten Birthday Cut Off*</label>
                             <div class="">
                                 <input name="kindergarten_birthday_cut_off"
-                                    value="{{ date('m/d/Y', strtotime($enrollment->kindergarten_birthday_cut_off)) }}"
+                                    value="<?php echo e(date('m/d/Y', strtotime($enrollment->kindergarten_birthday_cut_off))); ?>"
                                     class="form-control" id="kindergarten_birthday_cut_off">
                                 <small>After this date, submissions applying for Kindergarten will not be accepted.</small>
                                 <br>
-                                @if ($errors->has('kindergarten_birthday_cut_off'))
+                                <?php if($errors->has('kindergarten_birthday_cut_off')): ?>
                                     <span class="error">
-                                        {{ $errors->first('kindergarten_birthday_cut_off') }}
+                                        <?php echo e($errors->first('kindergarten_birthday_cut_off')); ?>
+
                                     </span>
-                                @endif
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -165,15 +173,16 @@
                             <label for="">First Grade Birthday Cut Off *</label>
                             <div class="">
                                 <input name="first_grade_birthday_cut_off"
-                                    value="{{ date('m/d/Y', strtotime($enrollment->first_grade_birthday_cut_off)) }}"
+                                    value="<?php echo e(date('m/d/Y', strtotime($enrollment->first_grade_birthday_cut_off))); ?>"
                                     class="form-control" id="first_grade_birthday_cut_off">
                                 <small>After this date, submissions applying for First grade will not be accepted.</small>
                                 <br>
-                                @if ($errors->has('first_grade_birthday_cut_off'))
+                                <?php if($errors->has('first_grade_birthday_cut_off')): ?>
                                     <span class="error">
-                                        {{ $errors->first('first_grade_birthday_cut_off') }}
+                                        <?php echo e($errors->first('first_grade_birthday_cut_off')); ?>
+
                                     </span>
-                                @endif
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -183,26 +192,25 @@
         <div class="box content-header-floating" id="listFoot">
             <div class="row">
                 <div class="col-lg-12 text-right hidden-xs float-right">
-                    {{-- <button type="submit" class="btn btn-warning btn-xs"><i class="fa fa-save"></i> Save </button> 
-                    <button class="btn btn-success btn-xs" name="exit"><i class="fa fa-save"></i> Save &amp; Exit</button>  --}}
+                    
                     <button type="submit" class="btn btn-warning btn-xs" name="submit" value="Save"><i
                             class="fa fa-save"></i> Save </button>
                     <button type="Submit" name="save_exit" value="save_exit" class="btn btn-success btn-xs submit"><i
                             class="fa fa-save"></i> Save &amp; Exit</button>
-                    <a class="btn btn-danger btn-xs" href="{{ url('/admin/Enrollment') }}"><i class="fa fa-times"></i>
+                    <a class="btn btn-danger btn-xs" href="<?php echo e(url('/admin/Enrollment')); ?>"><i class="fa fa-times"></i>
                         Cancel</a>
-                    {{-- <a class="btn btn-danger btn-xs" href="javascript:void(0);"><i class="far fa-trash-alt"></i> Delete</a> --}}
+                    
                 </div>
             </div>
         </div>
     </form>
-@stop
+<?php $__env->stopSection(); ?>
 
-@section('scripts')
+<?php $__env->startSection('scripts'); ?>
     <!-- InstanceBeginEditable name="Footer Scripts" -->
-    <script type="text/javascript" src="{{ url('resources/assets/admin/plugins/jquery-ui/jquery-ui.min.js') }}"></script>
-    <script src="{{ asset('resources/assets/admin/js/jquery.validate.min.js') }}"></script>
-    <script src="{{ asset('resources/assets/admin/js/additional-methods.min.js') }}"></script>
+    <script type="text/javascript" src="<?php echo e(url('resources/assets/admin/plugins/jquery-ui/jquery-ui.min.js')); ?>"></script>
+    <script src="<?php echo e(asset('resources/assets/admin/js/jquery.validate.min.js')); ?>"></script>
+    <script src="<?php echo e(asset('resources/assets/admin/js/additional-methods.min.js')); ?>"></script>
 
     <script>
         $(function() {
@@ -322,4 +330,6 @@
         });
     </script>
 
-@stop
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.admin.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\vipuljadav\www\projects\laravel\MagnetMCPSS\app/Modules/Enrollment/Views/edit.blade.php ENDPATH**/ ?>

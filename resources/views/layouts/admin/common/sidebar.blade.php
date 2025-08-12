@@ -165,13 +165,12 @@
 
                 @if (checkPermission(Auth::user()->role_id, 'Submissions') == 1)
                     <li
-                        class="{{ Request::is('admin/Submissions*') || Request::is('admin/CustomCommunication*') || Request::is('admin/GenerateApplicationData*') || Request::is('admin/GenerateApplicationData/contract*') || Request::is('admin/Reports/admin_review*') || Request::is('admin/Reports/missing/15/gradecdiupload*') || Request::is('admin/Reports/export/submissions*') ? 'mm-active' : '' }}">
+                        class="{{ Request::is('admin/Submissions*') || Request::is('admin/CustomCommunication*') || Request::is('admin/GenerateApplicationData*') || Request::is('admin/GenerateApplicationData/contract*') || Request::is('admin/Reports/admin_review*') || Request::is('admin/Reports/missing/15/gradecdiupload*') ? 'mm-active' : '' }}">
                         <a title="Submission Workspace" href="javascript:void(0);"
-                            class="{{ Request::is('admin/Submissions*') || Request::is('admin/CustomCommunication*') || Request::is('admin/GenerateApplicationData*') || Request::is('admin/GenerateApplicationData/contract*') || Request::is('admin/Reports/admin_review*') || Request::is('admin/Reports/missing/15/gradecdiupload*') || Request::is('admin/Reports/export/submissions*') ? 'active' : '' }}"><i
+                            class="{{ Request::is('admin/Submissions*') || Request::is('admin/CustomCommunication*') || Request::is('admin/GenerateApplicationData*') || Request::is('admin/GenerateApplicationData/contract*') || Request::is('admin/Reports/admin_review*') || Request::is('admin/Reports/missing/15/gradecdiupload*') ? 'mm-active' : '' }}"><i
                                 class="far fa-address-card"></i><span>Submission Workspace</span> <span
                                 class="menu-arrow"></span></a>
-                        <ul class="nav-second-level"
-                            {{ Request::is('admin/Submissions*') || Request::is('admin/CustomCommunication*') || Request::is('admin/GenerateApplicationData*') || Request::is('admin/GenerateApplicationData/contract*') || Request::is('admin/Reports/admin_review*') || Request::is('admin/Reports/missing/15/gradecdiupload*') || Request::is('admin/Reports/export/submissions*') ? 'mm-show' : '' }}
+                        <ul class="nav-second-level {{ Request::is('admin/Submissions*') || Request::is('admin/CustomCommunication*') || Request::is('admin/GenerateApplicationData*') || Request::is('admin/GenerateApplicationData/contract*') || Request::is('admin/Reports/admin_review*') || Request::is('admin/Reports/missing/15/gradecdiupload*') ? 'mm-show' : '' }}"
                             aria-expanded="false">
                             <li
                                 class="{{ Request::is('admin/Submissions') && !Request::is('admin/Submissions/*') ? 'mm-active' : '' }}">
