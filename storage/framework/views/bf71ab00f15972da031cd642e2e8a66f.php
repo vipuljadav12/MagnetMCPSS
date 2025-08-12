@@ -1,0 +1,1 @@
+<h1>sadfasf</h1><?php /**PATH D:\vipuljadav\www\projects\laravel\MagnetMCPSS\app/Modules/Submissions/Views/index.blade.php ENDPATH**/ ?>

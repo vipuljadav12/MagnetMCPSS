@@ -3,8 +3,6 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
-use Session;
-
 class Submission extends Model
 {
     protected $table = 'submissions';
