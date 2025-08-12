@@ -193,8 +193,8 @@
 <?php $__env->startSection('scripts'); ?>
     <!-- InstanceBeginEditable name="Footer Scripts" -->
     <script type="text/javascript" src="<?php echo e(url('resources/assets/admin/plugins/jquery-ui/jquery-ui.min.js')); ?>"></script>
-    <script src="<?php echo e(asset('resources/assets/common/js/jquery.validate.min.js')); ?>"></script>
-    <script src="<?php echo e(asset('resources/assets/common/js/additional-methods.min.js')); ?>"></script>
+    <script src="<?php echo e(asset('resources/assets/admin/js/jquery.validate.min.js')); ?>"></script>
+    <script src="<?php echo e(asset('resources/assets/admin/js/additional-methods.min.js')); ?>"></script>
 
     <script>
 
