@@ -16,6 +16,7 @@ use App\Modules\SetEligibility\Models\SetEligibility;
 use App\Modules\Eligibility\Models\{Eligibility, EligibilityContent, SubjectManagement};
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Log;
 
 class EnrollmentController extends Controller
 {
@@ -48,7 +49,7 @@ class EnrollmentController extends Controller
             'school_year' => 'required|max:10|string|regex:/(^[\d]+[\-][\d]+$)/',
             // 'school_year' => 'required|max:10|string|regex:/^[0-9-]*$/',
             'confirmation_style' => 'required|max:30|string|regex:/[0-9a-z\s]+$/i',
-            'import_grades_by' => 'required',
+            // 'import_grades_by' => 'required|string',
             'begning_date' => 'required|date',
             'ending_date' => 'required|date|after_or_equal:begning_date',
             'perk_birthday_cut_off' => 'required|date',
@@ -66,57 +67,78 @@ class EnrollmentController extends Controller
 
     public function store(Request $request)
     {
-        $validation = $this->validationRules();
-        $this->validate($request, $validation->rules, $validation->messages);
+        try {
+            $validation = $this->validationRules();
+            $this->validate($request, $validation->rules, $validation->messages);
 
-        switch ($request->import_grades_by) {
-            case 'submission_date':
-                $request['import_grades_by'] = 'SD';
-                break;
-            default:
-                $request['import_grades_by'] = '';
-        }
-        $req = $request->all();
-        $req['begning_date'] = date("Y-m-d", strtotime($req['begning_date']));
-        $req['ending_date'] = date("Y-m-d", strtotime($req['ending_date']));
-        $req['first_grade_birthday_cut_off'] = date("Y-m-d", strtotime($req['first_grade_birthday_cut_off']));
-        $req['kindergarten_birthday_cut_off'] = date("Y-m-d", strtotime($req['kindergarten_birthday_cut_off']));
-        $req['perk_birthday_cut_off'] = date("Y-m-d", strtotime($req['perk_birthday_cut_off']));
+            // Set default value for import_grades_by if not provided
+            if (empty($request->import_grades_by)) {
+                $request['import_grades_by'] = 'submission_date';
+            }
 
-        unset($req['exit']);
-        unset($req['save_exit']);
-        unset($req['_token']);
-        unset($req['submit']);
-        $req['district_id'] = Session('district_id');
+            switch ($request->import_grades_by) {
+                case 'submission_date':
+                    $request['import_grades_by'] = 'SD';
+                    break;
+                case 'grade_level':
+                    $request['import_grades_by'] = 'GL';
+                    break;
+                case 'other':
+                    $request['import_grades_by'] = 'OT';
+                    break;
+                default:
+                    // If no valid option is selected, set a default value
+                    $request['import_grades_by'] = 'SD';
+            }
+            $req = $request->all();
+            $req['begning_date'] = date("Y-m-d", strtotime($req['begning_date']));
+            $req['ending_date'] = date("Y-m-d", strtotime($req['ending_date']));
+            $req['first_grade_birthday_cut_off'] = date("Y-m-d", strtotime($req['first_grade_birthday_cut_off']));
+            $req['kindergarten_birthday_cut_off'] = date("Y-m-d", strtotime($req['kindergarten_birthday_cut_off']));
+            $req['perk_birthday_cut_off'] = date("Y-m-d", strtotime($req['perk_birthday_cut_off']));
 
-        $last_enroll_id = Enrollment::where('status', '!=', 'T')->where('district_id', Session::get('district_id'))->latest('ending_date')->first(['id']);
-        $enroll_id = Enrollment::create($req)->id;
-        $storePriority = $this->createPriority($enroll_id, $last_enroll_id->id);
-        $programs = $request->program;
-        $program_ids_by_key_value = $this->createProgram($enroll_id, $programs, $last_enroll_id->id);
+            unset($req['exit']);
+            unset($req['save_exit']);
+            unset($req['_token']);
+            unset($req['submit']);
+            $req['district_id'] = Session('district_id');
 
-        // always call this function after creation of new programs.
-        $application_ids_by_key_value = $this->createApplication($enroll_id, $last_enroll_id->id);
+            $last_enroll_id = Enrollment::where('status', '!=', 'T')->where('district_id', Session::get('district_id'))->latest('ending_date')->first(['id']);
 
-        $this->createEligibility($enroll_id, $last_enroll_id->id, $application_ids_by_key_value, $program_ids_by_key_value);
-        $this->setSubjectManagement($enroll_id);
+            $enroll_id = Enrollment::create($req)->id;
+            $storePriority = $this->createPriority($enroll_id, $last_enroll_id->id);
+            $programs = $request->program;
+            $program_ids_by_key_value = $this->createProgram($enroll_id, $programs, $last_enroll_id->id);
 
-        if (isset($program_ids_by_key_value)) {
-            $newObj = Enrollment::where('id', $enroll_id)->first();
-            $this->modelCreate($newObj, "enrollment");
-            Session::flash('success', "Enrollment Period added successfully.");
-        } else {
-            Session::flash('success', "Enrollment Period not added.");
-            return redirect('admin/Enrollment/create');
-        }
+            // always call this function after creation of new programs.
+            $application_ids_by_key_value = $this->createApplication($enroll_id, $last_enroll_id->id);
 
-        if (isset($request->save_exit)) {
+            $this->createEligibility($enroll_id, $last_enroll_id->id, $application_ids_by_key_value, $program_ids_by_key_value);
+            $this->setSubjectManagement($enroll_id);
+
+            if (isset($program_ids_by_key_value)) {
+                $newObj = Enrollment::where('id', $enroll_id)->first();
+                $this->modelCreate($newObj, "enrollment");
+                Session::flash('success', "Enrollment Period added successfully.");
+            } else {
+                Session::flash('success', "Enrollment Period not added.");
+                return redirect('admin/Enrollment/create');
+            }
+
+            if (isset($request->save_exit)) {
+                return redirect('admin/Enrollment');
+            } else {
+                // return redirect()->back();
+                return redirect("admin/Enrollment/edit/" . $enroll_id);
+            }
             return redirect('admin/Enrollment');
-        } else {
-            // return redirect()->back();
-            return redirect("admin/Enrollment/edit/" . $enroll_id);
+        } catch (\Exception $e) {
+            Log::error('Enrollment store error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+
+            Session::flash('error', "An error occurred while creating the enrollment. Please check the logs for details.");
+            return redirect('admin/Enrollment/create')->withInput();
         }
-        return redirect('admin/Enrollment');
     }
 
     public function createEligibility($enroll_id, $last_enroll_id, $application_ids_by_key_value, $program_ids_by_key_value)
@@ -267,6 +289,7 @@ class EnrollmentController extends Controller
     {
 
         $old_program_id = $new_program_id = $program_ids = [];
+        $oldpriority_id = $newpriority_id = []; // Declare these arrays
         $oldpriorities = Priority::where('district_id', session('district_id'))->where('status', '!=', 'T')->where('enrollment_id', $last_enroll_id)->get();
         $newpriorities = Priority::where('district_id', session('district_id'))->where('status', '!=', 'T')->where('enrollment_id', $enroll_id)->get();
         foreach ($oldpriorities as $key => $value) {
@@ -382,54 +405,75 @@ class EnrollmentController extends Controller
 
     public function update(Request $request, $id)
     {
-        $validation = $this->validationRules();
-        $this->validate($request, $validation->rules, $validation->messages);
+        try {
+            $validation = $this->validationRules();
+            $this->validate($request, $validation->rules, $validation->messages);
 
-        // Selecting value for import_grades_by
-        switch ($request->import_grades_by) {
-            case 'submission_date':
-                $request['import_grades_by'] = 'SD';
-                break;
-            default:
-                $request['import_grades_by'] = '';
-        }
-
-        $req = $request->all();
-        $req['begning_date'] = date("Y-m-d", strtotime($req['begning_date']));
-        $req['ending_date'] = date("Y-m-d", strtotime($req['ending_date']));
-        $req['first_grade_birthday_cut_off'] = date("Y-m-d", strtotime($req['first_grade_birthday_cut_off']));
-        $req['kindergarten_birthday_cut_off'] = date("Y-m-d", strtotime($req['kindergarten_birthday_cut_off']));
-        $req['perk_birthday_cut_off'] = date("Y-m-d", strtotime($req['perk_birthday_cut_off']));
-
-        unset($req['exit']);
-        unset($req['save_exit']);
-        unset($req['_token']);
-        unset($req['submit']);
-
-        $initObj = Enrollment::where('id', $id)->first();
-        $update = Enrollment::where('id', $id)
-            ->update($req);
-        $newObj = Enrollment::where('id', $id)->first();
-
-
-        if (isset($update)) {
-            //$this->modelChanges($initObj,$newObj,"Enrollment");
-            Session::flash('success', "Enrollment Period updated successfully.");
-            if ($request->has('exit')) {
-                return redirect('admin/Enrollment');
+            // Set default value for import_grades_by if not provided
+            if (empty($request->import_grades_by)) {
+                $request['import_grades_by'] = 'submission_date';
             }
-        } else {
-            Session::flash('success', "Enrollment Period not updated.");
-            // return redirect('admin/Enrollment/edit/'.$id);
+
+            // Selecting value for import_grades_by
+            switch ($request->import_grades_by) {
+                case 'submission_date':
+                    $request['import_grades_by'] = 'SD';
+                    break;
+                case 'grade_level':
+                    $request['import_grades_by'] = 'GL';
+                    break;
+                case 'other':
+                    $request['import_grades_by'] = 'OT';
+                    break;
+                default:
+                    // If no valid option is selected, set a default value
+                    $request['import_grades_by'] = 'SD';
+            }
+
+            $req = $request->all();
+            $req['begning_date'] = date("Y-m-d", strtotime($req['begning_date']));
+            $req['ending_date'] = date("Y-m-d", strtotime($req['ending_date']));
+            $req['first_grade_birthday_cut_off'] = date("Y-m-d", strtotime($req['first_grade_birthday_cut_off']));
+            $req['kindergarten_birthday_cut_off'] = date("Y-m-d", strtotime($req['kindergarten_birthday_cut_off']));
+            $req['perk_birthday_cut_off'] = date("Y-m-d", strtotime($req['perk_birthday_cut_off']));
+
+            unset($req['exit']);
+            unset($req['save_exit']);
+            unset($req['_token']);
+            unset($req['submit']);
+
+            $initObj = Enrollment::where('id', $id)->first();
+            $update = Enrollment::where('id', $id)
+                ->update($req);
+            $newObj = Enrollment::where('id', $id)->first();
+
+
+            if (isset($update)) {
+                //$this->modelChanges($initObj,$newObj,"Enrollment");
+                Session::flash('success', "Enrollment Period updated successfully.");
+                if ($request->has('exit')) {
+                    return redirect('admin/Enrollment');
+                }
+            } else {
+                Session::flash('success', "Enrollment Period not updated.");
+                // return redirect('admin/Enrollment/edit/'.$id);
+            }
+            if (isset($request->save_exit)) {
+                return redirect('admin/Enrollment');
+            } else {
+                // return redirect()->back();
+                return redirect("admin/Enrollment/edit/" . $id);
+            }
+            return redirect('admin/Enrollment/edit/' . $id);
+            // return redirect('admin/Enrollment');
+
+        } catch (\Exception $e) {
+            Log::error('Enrollment update error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+
+            Session::flash('error', "An error occurred while updating the enrollment. Please check the logs for details.");
+            return redirect('admin/Enrollment/edit/' . $id)->withInput();
         }
-        if (isset($request->save_exit)) {
-            return redirect('admin/Enrollment');
-        } else {
-            // return redirect()->back();
-            return redirect("admin/Enrollment/edit/" . $id);
-        }
-        return redirect('admin/Enrollment/edit/' . $id);
-        // return redirect('admin/Enrollment');
     }
 
     public function updateStatus(Request $request)
