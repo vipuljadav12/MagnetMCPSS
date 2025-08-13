@@ -321,9 +321,9 @@
                     <ul class="nav-second-level <?php echo e(Request::is('admin/LateSubmission*') || Request::is('admin/DistrictConfiguration/edit_late_submission_text*') || Request::is('admin/DistrictConfiguration/edit_late_submission_email*') ? 'mm-show' : ''); ?>"
                         aria-expanded="false">
                         <li
-                            class="<?php echo e(Request::is('admin/LateSubmission') && !Request::is('admin/LateSubmission/*') ? 'mm-active' : ''); ?>">
+                            class="<?php echo e((Request::is('admin/LateSubmission') || Request::is('admin/LateSubmission/*')) && !Request::is('admin/LateSubmission/EditCommunication*') ? 'mm-active' : ''); ?>">
                             <a title="Process Waitlist" href="<?php echo e(url('/admin/LateSubmission')); ?>"
-                                class="<?php echo e(Request::is('admin/LateSubmission') && !Request::is('admin/LateSubmission/*') ? 'active' : ''); ?>"><span>Run
+                                class="<?php echo e((Request::is('admin/LateSubmission') || Request::is('admin/LateSubmission/*')) && !Request::is('admin/LateSubmission/EditCommunication*') ? 'active' : ''); ?>"><span>Run
                                     Selection</span></a>
                         </li>
                         <li class="<?php echo e(Request::is('admin/LateSubmission/EditCommunication*') ? 'mm-active' : ''); ?>"><a
@@ -447,11 +447,11 @@
                 <?php endif; ?>
                 <?php if(Auth::user()->role_id == 1): ?>
                     <li
-                        class="master <?php echo e(Request::is('admin/District*') || Request::is('admin/Program*') || Request::is('admin/Eligibility*') || Request::is('admin/School*') || Request::is('admin/Priority*') || Request::is('admin/Reports') || Request::is('admin/Form*') || Request::is('admin/Role*') || Request::is('admin/StudentSearch*') ? 'mm-active' : ''); ?>">
+                        class="master <?php echo e(Request::is('admin/District*') || Request::is('admin/Program*') || Request::is('admin/Eligibility*') || Request::is('admin/School*') || Request::is('admin/Priority*') || Request::is('admin/Reports') || Request::is('admin/Form*') || Request::is('admin/Role*') || Request::is('admin/Permission*') || Request::is('admin/StudentSearch*') ? 'mm-active' : ''); ?>">
                         <a title="" href="javascript:void(0);"
-                            class="<?php echo e(Request::is('admin/District*') || Request::is('admin/Program*') || Request::is('admin/Eligibility*') || Request::is('admin/School*') || Request::is('admin/Priority*') || Request::is('admin/Reports') || Request::is('admin/Form*') || Request::is('admin/Role*') || Request::is('admin/StudentSearch*') ? 'mm-active' : ''); ?>"><i
+                            class="<?php echo e(Request::is('admin/District*') || Request::is('admin/Program*') || Request::is('admin/Eligibility*') || Request::is('admin/School*') || Request::is('admin/Priority*') || Request::is('admin/Reports') || Request::is('admin/Form*') || Request::is('admin/Role*') || Request::is('admin/Permission*') || Request::is('admin/StudentSearch*') ? 'mm-active' : ''); ?>"><i
                                 class="far fa-gem"></i><span>Master</span> <span class="menu-arrow"></span></a>
-                        <ul class="nav-second-level <?php echo e(Request::is('admin/District*') || Request::is('admin/Program*') || Request::is('admin/Eligibility*') || Request::is('admin/School*') || Request::is('admin/Priority*') || Request::is('admin/Reports') || Request::is('admin/Form*') || Request::is('admin/Role*') || Request::is('admin/StudentSearch*') ? 'mm-show' : ''); ?>"
+                        <ul class="nav-second-level <?php echo e(Request::is('admin/District*') || Request::is('admin/Program*') || Request::is('admin/Eligibility*') || Request::is('admin/School*') || Request::is('admin/Priority*') || Request::is('admin/Reports') || Request::is('admin/Form*') || Request::is('admin/Role*') || Request::is('admin/Permission*') || Request::is('admin/StudentSearch*') ? 'mm-show' : ''); ?>"
                             aria-expanded="false">
                             <?php if(checkPermission(Auth::user()->role_id, 'District') == 1): ?>
                                 <?php if(Session::get('super_admin') == 'Y'): ?>
@@ -486,9 +486,9 @@
                                     class="<?php echo e(Request::is('admin/Reports') ? 'active' : ''); ?>"><span>Selection
                                         Report
                                         Master</span></a></li>
-                            <li class="<?php echo e(Request::is('admin/Role*') ? 'mm-active' : ''); ?>"><a
+                            <li class="<?php echo e(Request::is('admin/Role*') || Request::is('admin/Permission*') ? 'mm-active' : ''); ?>"><a
                                     title="Priority Master" href="<?php echo e(url('/admin/Role')); ?>"
-                                    class="<?php echo e(Request::is('admin/Role*') ? 'active' : ''); ?>"><span>User Role
+                                    class="<?php echo e(Request::is('admin/Role*') || Request::is('admin/Permission*') ? 'active' : ''); ?>"><span>User Role
                                         Master</span></a></li>
                             <li class="<?php echo e(Request::is('admin/StudentSearch*') ? 'mm-active' : ''); ?>"><a
                                     title="Student Data Override" href="<?php echo e(url('')); ?>/admin/StudentSearch"

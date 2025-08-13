@@ -321,9 +321,9 @@
                     <ul class="nav-second-level {{ Request::is('admin/LateSubmission*') || Request::is('admin/DistrictConfiguration/edit_late_submission_text*') || Request::is('admin/DistrictConfiguration/edit_late_submission_email*') ? 'mm-show' : '' }}"
                         aria-expanded="false">
                         <li
-                            class="{{ Request::is('admin/LateSubmission') && !Request::is('admin/LateSubmission/*') ? 'mm-active' : '' }}">
+                            class="{{ (Request::is('admin/LateSubmission') || Request::is('admin/LateSubmission/*')) && !Request::is('admin/LateSubmission/EditCommunication*') ? 'mm-active' : '' }}">
                             <a title="Process Waitlist" href="{{ url('/admin/LateSubmission') }}"
-                                class="{{ Request::is('admin/LateSubmission') && !Request::is('admin/LateSubmission/*') ? 'active' : '' }}"><span>Run
+                                class="{{ (Request::is('admin/LateSubmission') || Request::is('admin/LateSubmission/*')) && !Request::is('admin/LateSubmission/EditCommunication*') ? 'active' : '' }}"><span>Run
                                     Selection</span></a>
                         </li>
                         <li class="{{ Request::is('admin/LateSubmission/EditCommunication*') ? 'mm-active' : '' }}"><a
@@ -447,11 +447,11 @@
                 @endif
                 @if (Auth::user()->role_id == 1)
                     <li
-                        class="master {{ Request::is('admin/District*') || Request::is('admin/Program*') || Request::is('admin/Eligibility*') || Request::is('admin/School*') || Request::is('admin/Priority*') || Request::is('admin/Reports') || Request::is('admin/Form*') || Request::is('admin/Role*') || Request::is('admin/StudentSearch*') ? 'mm-active' : '' }}">
+                        class="master {{ Request::is('admin/District*') || Request::is('admin/Program*') || Request::is('admin/Eligibility*') || Request::is('admin/School*') || Request::is('admin/Priority*') || Request::is('admin/Reports') || Request::is('admin/Form*') || Request::is('admin/Role*') || Request::is('admin/Permission*') || Request::is('admin/StudentSearch*') ? 'mm-active' : '' }}">
                         <a title="" href="javascript:void(0);"
-                            class="{{ Request::is('admin/District*') || Request::is('admin/Program*') || Request::is('admin/Eligibility*') || Request::is('admin/School*') || Request::is('admin/Priority*') || Request::is('admin/Reports') || Request::is('admin/Form*') || Request::is('admin/Role*') || Request::is('admin/StudentSearch*') ? 'mm-active' : '' }}"><i
+                            class="{{ Request::is('admin/District*') || Request::is('admin/Program*') || Request::is('admin/Eligibility*') || Request::is('admin/School*') || Request::is('admin/Priority*') || Request::is('admin/Reports') || Request::is('admin/Form*') || Request::is('admin/Role*') || Request::is('admin/Permission*') || Request::is('admin/StudentSearch*') ? 'mm-active' : '' }}"><i
                                 class="far fa-gem"></i><span>Master</span> <span class="menu-arrow"></span></a>
-                        <ul class="nav-second-level {{ Request::is('admin/District*') || Request::is('admin/Program*') || Request::is('admin/Eligibility*') || Request::is('admin/School*') || Request::is('admin/Priority*') || Request::is('admin/Reports') || Request::is('admin/Form*') || Request::is('admin/Role*') || Request::is('admin/StudentSearch*') ? 'mm-show' : '' }}"
+                        <ul class="nav-second-level {{ Request::is('admin/District*') || Request::is('admin/Program*') || Request::is('admin/Eligibility*') || Request::is('admin/School*') || Request::is('admin/Priority*') || Request::is('admin/Reports') || Request::is('admin/Form*') || Request::is('admin/Role*') || Request::is('admin/Permission*') || Request::is('admin/StudentSearch*') ? 'mm-show' : '' }}"
                             aria-expanded="false">
                             @if (checkPermission(Auth::user()->role_id, 'District') == 1)
                                 @if (Session::get('super_admin') == 'Y')
@@ -486,9 +486,9 @@
                                     class="{{ Request::is('admin/Reports') ? 'active' : '' }}"><span>Selection
                                         Report
                                         Master</span></a></li>
-                            <li class="{{ Request::is('admin/Role*') ? 'mm-active' : '' }}"><a
+                            <li class="{{ Request::is('admin/Role*') || Request::is('admin/Permission*') ? 'mm-active' : '' }}"><a
                                     title="Priority Master" href="{{ url('/admin/Role') }}"
-                                    class="{{ Request::is('admin/Role*') ? 'active' : '' }}"><span>User Role
+                                    class="{{ Request::is('admin/Role*') || Request::is('admin/Permission*') ? 'active' : '' }}"><span>User Role
                                         Master</span></a></li>
                             <li class="{{ Request::is('admin/StudentSearch*') ? 'mm-active' : '' }}"><a
                                     title="Student Data Override" href="{{ url('') }}/admin/StudentSearch"
