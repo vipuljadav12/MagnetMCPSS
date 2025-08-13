@@ -56,7 +56,7 @@ class SubmissionsController extends Controller
 
     public function index()
     {
-
+        ini_set('memory_limit', '256M');
 
         /*$today="2021-01-16 01:05:09";
         $nextday=date("Y-m-d H:i:s", strtotime("$today +4 hour"));
