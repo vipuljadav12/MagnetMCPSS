@@ -169,7 +169,7 @@ $(document).on("click",".side-menu-btn",function(){
     .side-menu.active .slimscroll-menu {left: -260px !important; transition: all 0.3s !important;}
     .content-wrapper {margin-left: 260px !important; transition: all 0.3s !important; position: relative;}
     .content-wrapper.active {margin-left: 0px !important; transition: all 0.3s !important;}
-    footer {margin-left: 260px !important; transition: all 0.3s !important; position: relative;}
+    footer {transition: all 0.3s !important; position: relative;}
     footer.active {margin-left: 0px !important; transition: all 0.3s !important;}
 </style>
 
